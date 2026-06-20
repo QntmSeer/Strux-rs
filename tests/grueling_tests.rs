@@ -1,5 +1,5 @@
 // ponytail: grueling integration tests testing edge cases, degeneracies, and PBC boundary conditions.
-use strux_rs::analysis::{calculate_rg, calculate_rmsd_kabsch, calculate_rmsd_raw, find_interface_contacts};
+use strux_rs::analysis::{calculate_rmsd_kabsch, calculate_rmsd_raw, find_interface_contacts};
 
 fn pseudo_random_coords(size: usize, seed: u32) -> Vec<[f32; 3]> {
     let mut coords = Vec::with_capacity(size);
