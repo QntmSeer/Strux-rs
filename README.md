@@ -10,7 +10,7 @@ It acts as a drop-in accelerator for slow CPU-bound bottlenecks in molecular dyn
 
 ---
 
-## ⚡ Performance Speedups
+## Performance Speedups
 
 Benchmark performed on a **21-frame trajectory** of a designed E3 ubiquitin ligase binder containing **1,924 atoms per frame**:
 
@@ -30,7 +30,7 @@ Benchmark performed on a **21-frame trajectory** of a designed E3 ubiquitin liga
 
 ---
 
-## 🛠️ Features
+## Features
 
 * **Trajectory Parsing**: High-speed multi-model PDB text scanner returning a 3D NumPy array `[Frames, Atoms, 3]`.
 * **Kabsch Superposition**: RMSD alignment for coordinate superposition.
@@ -39,7 +39,7 @@ Benchmark performed on a **21-frame trajectory** of a designed E3 ubiquitin liga
 
 ---
 
-## 📦 Installation
+## Installation
 
 To build and compile `strux-rs` from source, ensure you have the Rust toolchain installed.
 
@@ -60,7 +60,7 @@ maturin develop --release
 
 ---
 
-## 🚀 Quickstart (Python API)
+## Quickstart (Python API)
 
 ```python
 import numpy as np
@@ -90,7 +90,7 @@ print(f"Detected {len(contacts)} contact pairs at the interface.")
 
 ---
 
-## 📂 Repository Layout
+## Repository Layout
 
 ```text
 strux-rs/
@@ -107,5 +107,5 @@ strux-rs/
 
 ---
 
-## 📄 License
+## License
 This project is licensed under the MIT License.
