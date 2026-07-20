@@ -3,8 +3,11 @@ use numpy::{PyArray3, PyArrayMethods, PyReadonlyArray2, PyReadonlyArray3};
 use pyo3::prelude::*;
 
 pub mod analysis;
+pub mod msa;
 pub mod pdb;
 pub mod spatial;
+
+pub use msa::Msa;
 
 #[pyfunction]
 fn parse_pdb(py: Python<'_>, path: &str) -> PyResult<Py<PyArray3<f32>>> {
@@ -146,13 +149,52 @@ fn find_interface_contacts(
     })
 }
 
+#[pyfunction]
+fn parse_a3m(py: Python<'_>, a3m_string: &str) -> PyResult<Msa> {
+    py.allow_threads(|| {
+        Ok(msa::parse_a3m_impl(a3m_string))
+    })
+}
+
+#[pyfunction]
+fn parse_a3m_file(py: Python<'_>, path: &str) -> PyResult<Msa> {
+    let content = py.allow_threads(|| {
+        std::fs::read_to_string(path)
+    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    py.allow_threads(|| {
+        Ok(msa::parse_a3m_impl(&content))
+    })
+}
+
+#[pyfunction]
+fn parse_stockholm(py: Python<'_>, stockholm_string: &str) -> PyResult<Msa> {
+    py.allow_threads(|| {
+        Ok(msa::parse_stockholm_impl(stockholm_string))
+    })
+}
+
+#[pyfunction]
+fn parse_stockholm_file(py: Python<'_>, path: &str) -> PyResult<Msa> {
+    let content = py.allow_threads(|| {
+        std::fs::read_to_string(path)
+    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    py.allow_threads(|| {
+        Ok(msa::parse_stockholm_impl(&content))
+    })
+}
+
 #[pymodule]
 fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<Msa>()?;
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rg, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_raw, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_kabsch, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsf, m)?)?;
     m.add_function(wrap_pyfunction!(find_interface_contacts, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_a3m, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_a3m_file, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_stockholm, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_stockholm_file, m)?)?;
     Ok(())
 }
