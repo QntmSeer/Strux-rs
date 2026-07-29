@@ -1,7 +1,10 @@
-// ponytail: fast A3M/Stockholm parsing with single-pass and Rayon.
+// ponytail: fast A3M/Stockholm parsing with 100% multi-threaded Rayon record splitting & memmap2.
 use pyo3::prelude::*;
 use numpy::{PyArray2, PyArrayMethods};
 use rayon::prelude::*;
+use std::fs::File;
+use std::path::Path;
+use memmap2::MmapOptions;
 
 #[pyclass]
 #[derive(Clone)]
@@ -89,35 +92,31 @@ impl Msa {
     }
 }
 
-pub fn parse_fasta(fasta_string: &str) -> (Vec<String>, Vec<String>) {
-    let mut sequences = Vec::new();
-    let mut descriptions = Vec::new();
-    let mut current_seq = String::new();
-
-    for line in fasta_string.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        if line.starts_with('>') {
-            if !descriptions.is_empty() {
-                sequences.push(current_seq);
-                current_seq = String::new();
-            }
-            descriptions.push(line[1..].to_string());
-        } else {
-            current_seq.push_str(line);
-        }
+#[inline]
+fn trim_bytes(bytes: &[u8]) -> &[u8] {
+    let mut start = 0;
+    let mut end = bytes.len();
+    while start < end && (bytes[start] == b' ' || bytes[start] == b'\t' || bytes[start] == b'\r') {
+        start += 1;
     }
-    if !descriptions.is_empty() {
-        sequences.push(current_seq);
+    while end > start && (bytes[end - 1] == b' ' || bytes[end - 1] == b'\t' || bytes[end - 1] == b'\r') {
+        end -= 1;
     }
-    (sequences, descriptions)
+    &bytes[start..end]
 }
 
 pub fn parse_a3m_impl(a3m_string: &str) -> Msa {
-    let (sequences, descriptions) = parse_fasta(a3m_string);
-    if sequences.is_empty() {
+    parse_a3m_bytes(a3m_string.as_bytes())
+}
+
+pub fn parse_a3m_bytes(bytes: &[u8]) -> Msa {
+    // 1. Split raw bytes by FASTA record delimiter '>'
+    let records: Vec<&[u8]> = bytes
+        .split(|&b| b == b'>')
+        .filter(|r| !trim_bytes(r).is_empty())
+        .collect();
+
+    if records.is_empty() {
         return Msa {
             sequences: Vec::new(),
             descriptions: Vec::new(),
@@ -127,35 +126,57 @@ pub fn parse_a3m_impl(a3m_string: &str) -> Msa {
         };
     }
 
-    // Process all sequences in parallel using Rayon.
-    let results: Vec<(String, Vec<i32>)> = sequences
+    // 2. Parse descriptions, sequence cleaning, and deletion counting 100% in parallel
+    let results: Vec<(String, String, Vec<i32>)> = records
         .par_iter()
-        .map(|seq| {
-            let bytes = seq.as_bytes();
-            let mut aligned_seq = String::with_capacity(bytes.len());
-            let mut deletion_vec = Vec::with_capacity(bytes.len());
+        .map(|record| {
+            let record_trimmed = trim_bytes(record);
+            // Split into header line and sequence body lines
+            let mut line_iter = record_trimmed.split(|&b| b == b'\n');
+            let header_raw = line_iter.next().unwrap_or(&[]);
+            let header = String::from_utf8_lossy(trim_bytes(header_raw)).to_string();
+
+            let mut aligned_seq = String::with_capacity(record_trimmed.len());
+            let mut deletion_vec = Vec::with_capacity(record_trimmed.len());
             let mut deletion_count = 0;
 
-            for &b in bytes {
-                if b.is_ascii_lowercase() {
-                    deletion_count += 1;
-                } else {
-                    aligned_seq.push(b as char);
-                    deletion_vec.push(deletion_count);
-                    deletion_count = 0;
+            for seq_line in line_iter {
+                let trimmed_line = trim_bytes(seq_line);
+                if trimmed_line.is_empty() || trimmed_line[0] == b'#' {
+                    continue;
+                }
+                for &b in trimmed_line {
+                    if b.is_ascii_lowercase() {
+                        deletion_count += 1;
+                    } else {
+                        aligned_seq.push(b as char);
+                        deletion_vec.push(deletion_count);
+                        deletion_count = 0;
+                    }
                 }
             }
-            (aligned_seq, deletion_vec)
+            (header, aligned_seq, deletion_vec)
         })
         .collect();
 
     let num_seqs = results.len();
-    let num_res = results[0].1.len();
+    if num_seqs == 0 {
+        return Msa {
+            sequences: Vec::new(),
+            descriptions: Vec::new(),
+            deletion_matrix_flat: Vec::new(),
+            num_seqs: 0,
+            num_res: 0,
+        };
+    }
+    let num_res = results[0].2.len();
 
+    let mut descriptions = Vec::with_capacity(num_seqs);
     let mut aligned_sequences = Vec::with_capacity(num_seqs);
     let mut deletion_matrix_flat = Vec::with_capacity(num_seqs * num_res);
 
-    for (aligned_seq, deletion_vec) in results {
+    for (header, aligned_seq, deletion_vec) in results {
+        descriptions.push(header);
         aligned_sequences.push(aligned_seq);
         deletion_matrix_flat.extend(deletion_vec);
     }
@@ -169,17 +190,38 @@ pub fn parse_a3m_impl(a3m_string: &str) -> Msa {
     }
 }
 
+pub fn parse_a3m_file_impl<P: AsRef<Path>>(path: P) -> Result<Msa, std::io::Error> {
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    if metadata.len() == 0 {
+        return Ok(Msa {
+            sequences: Vec::new(),
+            descriptions: Vec::new(),
+            deletion_matrix_flat: Vec::new(),
+            num_seqs: 0,
+            num_res: 0,
+        });
+    }
+    let mmap = unsafe { MmapOptions::new().map(&file)? };
+    Ok(parse_a3m_bytes(&mmap[..]))
+}
+
 pub fn parse_stockholm_impl(stockholm_string: &str) -> Msa {
+    parse_stockholm_bytes(stockholm_string.as_bytes())
+}
+
+pub fn parse_stockholm_bytes(bytes: &[u8]) -> Msa {
     let mut names = Vec::new();
     let mut name_to_index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     let mut raw_sequences: Vec<String> = Vec::new();
 
-    for line in stockholm_string.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
+    for raw_line in bytes.split(|&b| b == b'\n') {
+        let line = trim_bytes(raw_line);
+        if line.is_empty() || line[0] == b'#' || line.starts_with(b"//") {
             continue;
         }
-        let mut parts = line.split_whitespace();
+        let line_str = String::from_utf8_lossy(line);
+        let mut parts = line_str.split_whitespace();
         if let (Some(name), Some(sequence)) = (parts.next(), parts.next()) {
             if let Some(&idx) = name_to_index.get(name) {
                 raw_sequences[idx].push_str(sequence);
@@ -213,7 +255,6 @@ pub fn parse_stockholm_impl(stockholm_string: &str) -> Msa {
 
     let num_res = keep_columns.len();
 
-    // Process all sequences in parallel using Rayon.
     let results: Vec<(String, Vec<i32>)> = raw_sequences
         .par_iter()
         .map(|seq| {
@@ -222,7 +263,6 @@ pub fn parse_stockholm_impl(stockholm_string: &str) -> Msa {
             let mut deletion_vec = Vec::with_capacity(num_res);
             let mut deletion_count = 0;
 
-            // 1. Build aligned sequence.
             for &idx in &keep_columns {
                 if idx < seq_bytes.len() {
                     aligned_seq.push(seq_bytes[idx] as char);
@@ -231,7 +271,6 @@ pub fn parse_stockholm_impl(stockholm_string: &str) -> Msa {
                 }
             }
 
-            // 2. Count deletions.
             let len = std::cmp::min(seq_bytes.len(), query_bytes.len());
             for idx in 0..len {
                 let seq_res = seq_bytes[idx];
@@ -246,7 +285,6 @@ pub fn parse_stockholm_impl(stockholm_string: &str) -> Msa {
                 }
             }
 
-            // Pad deletion_vec if sequence was shorter than query.
             while deletion_vec.len() < num_res {
                 deletion_vec.push(0);
             }
@@ -271,4 +309,20 @@ pub fn parse_stockholm_impl(stockholm_string: &str) -> Msa {
         num_seqs,
         num_res,
     }
+}
+
+pub fn parse_stockholm_file_impl<P: AsRef<Path>>(path: P) -> Result<Msa, std::io::Error> {
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    if metadata.len() == 0 {
+        return Ok(Msa {
+            sequences: Vec::new(),
+            descriptions: Vec::new(),
+            deletion_matrix_flat: Vec::new(),
+            num_seqs: 0,
+            num_res: 0,
+        });
+    }
+    let mmap = unsafe { MmapOptions::new().map(&file)? };
+    Ok(parse_stockholm_bytes(&mmap[..]))
 }

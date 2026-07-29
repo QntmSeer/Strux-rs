@@ -158,12 +158,10 @@ fn parse_a3m(py: Python<'_>, a3m_string: &str) -> PyResult<Msa> {
 
 #[pyfunction]
 fn parse_a3m_file(py: Python<'_>, path: &str) -> PyResult<Msa> {
-    let content = py.allow_threads(|| {
-        std::fs::read_to_string(path)
-    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    let p = path.to_string();
     py.allow_threads(|| {
-        Ok(msa::parse_a3m_impl(&content))
-    })
+        msa::parse_a3m_file_impl(&p)
+    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))
 }
 
 #[pyfunction]
@@ -175,12 +173,10 @@ fn parse_stockholm(py: Python<'_>, stockholm_string: &str) -> PyResult<Msa> {
 
 #[pyfunction]
 fn parse_stockholm_file(py: Python<'_>, path: &str) -> PyResult<Msa> {
-    let content = py.allow_threads(|| {
-        std::fs::read_to_string(path)
-    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    let p = path.to_string();
     py.allow_threads(|| {
-        Ok(msa::parse_stockholm_impl(&content))
-    })
+        msa::parse_stockholm_file_impl(&p)
+    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))
 }
 
 #[pymodule]
