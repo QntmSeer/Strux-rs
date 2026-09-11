@@ -87,27 +87,39 @@ for bar, rate, sp in zip(bars2, rates_2, speedups_2):
                  ha='center', va='bottom', fontsize=8, color='#111827')
 
 # ------------------------------------------------------------------------------
-# PANEL 3: Real Production Ingestion (Stockholm & AlphaFold BFD/Uniclust A3M)
+# PANEL 3: Real Production MSA Ingestion (Throughput in MB/s)
 # ------------------------------------------------------------------------------
-labels_3 = ['Kinase (STO)\nAF/OpenFold', 'Kinase (STO)\nstrux-rs', 'BFD/Uni (A3M)\nAF/OpenFold', 'BFD/Uni (A3M)\nstrux-rs']
-times_3 = [97.8, 72.1, 2.42, 0.60]  # ms
+# Ingestion throughput for real biological datasets:
+# 1. Human Kinase HMMER Stockholm (19.5 MB, 30,574 sequences)
+# 2. AlphaFold / ColabFold BFD/Uniclust A3M (104 KB, 1,024 sequences)
+# Rates:
+# Kinase STO: AF/OF = 199.5 MB/s (97.8 ms), strux-rs = 270.7 MB/s (72.1 ms) [1.4x]
+# BFD A3M: AF/OF = 41.9 MB/s (2.42 ms), strux-rs = 168.9 MB/s (0.60 ms) [4.0x]
+
+labels_3 = [
+    'Kinase STO\nAF/OpenFold',
+    'Kinase STO\nstrux-rs',
+    'BFD A3M\nAF/OpenFold',
+    'BFD A3M\nstrux-rs'
+]
+throughput_3 = [199.5, 270.7, 41.9, 168.9]  # MB/s
+speedups_3 = ['1.0x (Ref)', '1.4x (72 ms)', '1.0x (Ref)', '4.0x (0.6 ms)']
 colors_3 = ['#94a3b8', '#2563eb', '#94a3b8', '#2563eb']
-speedups_3 = ['1.0x (Ref)', '1.4x (271 MB/s)', '1.0x (Ref)', '4.0x (0.60 ms)']
 
-bars3 = ax3.bar(labels_3, times_3, color=colors_3, width=0.55, edgecolor='#1e293b', linewidth=0.8)
-ax3.set_yscale('log')
-ax3.set_ylim(0.2, 200)
-ax3.set_ylabel('Parse Latency (ms, log scale)', fontweight='bold')
-ax3.set_title('C. Real Metagenomic MSA Parsing', fontweight='bold', pad=10, fontsize=11)
-ax3.grid(True, which='both', axis='y')
-ax3.tick_params(axis='x', rotation=20)
+bars3 = ax3.bar(labels_3, throughput_3, color=colors_3, width=0.55, edgecolor='#1e293b', linewidth=0.8)
+ax3.set_ylim(0, 320)
+ax3.set_ylabel('Parsing Throughput (MB / s)', fontweight='bold')
+ax3.set_title('C. Real Metagenomic MSA Ingestion', fontweight='bold', pad=10, fontsize=11)
+ax3.grid(True, axis='y')
+ax3.tick_params(axis='x', rotation=18)
 
-for bar, t, sp in zip(bars3, times_3, speedups_3):
+for bar, rate, sp in zip(bars3, throughput_3, speedups_3):
     h = bar.get_height()
-    label = f'{t:.2f} ms\n({sp})'
+    label = f'{rate:.1f} MB/s\n({sp})'
     ax3.annotate(label, xy=(bar.get_x() + bar.get_width()/2, h),
                  xytext=(0, 4), textcoords="offset points",
-                 ha='center', va='bottom', fontsize=7.5, color='#111827')
+                 ha='center', va='bottom', fontsize=8, color='#111827')
+
 
 
 plt.tight_layout()
