@@ -185,34 +185,49 @@ impl GpuTrajectoryEngine {
         cutoff: f32,
     ) -> Result<Vec<u64>, DriverError> {
         let num_u64_per_frame = (num_res * num_res + 63) / 64;
-        let d_coords = self.dev.htod_sync_copy(flat_coords)?;
-        let mut d_bitmask = self.dev.alloc_zeros::<u64>(num_frames * num_u64_per_frame)?;
+        let mut host_bitmask = Vec::with_capacity(num_frames * num_u64_per_frame);
 
         let contact_fn = self.dev.get_func("qcp_module", "contact_map_bitmask_kernel").unwrap();
         let threads = 128;
         let blocks_x = (num_u64_per_frame + threads - 1) / threads;
-        let cfg = LaunchConfig {
-            grid_dim: (blocks_x as u32, 1, num_frames as u32),
-            block_dim: (threads as u32, 1, 1),
-            shared_mem_bytes: 0,
-        };
-
         let cutoff_sq = cutoff * cutoff;
-        unsafe {
-            contact_fn.launch(
-                cfg,
-                (
-                    &d_coords,
-                    &mut d_bitmask,
-                    cutoff_sq,
-                    num_frames as i32,
-                    num_res as i32,
-                    num_u64_per_frame as i32,
-                ),
-            )?;
+
+        // ponytail: stream contact bitmask computation in 500 MB chunks to bound VRAM usage on 4GB laptop GPUs
+        let max_u64_buf = (500 * 1024 * 1024) / 8;
+        let chunk_frames = (max_u64_buf / num_u64_per_frame).max(1).min(num_frames);
+
+        for start_f in (0..num_frames).step_by(chunk_frames) {
+            let cur_frames = (num_frames - start_f).min(chunk_frames);
+            let coord_start = start_f * num_res * 3;
+            let coord_end = coord_start + cur_frames * num_res * 3;
+
+            let d_coords = self.dev.htod_sync_copy(&flat_coords[coord_start..coord_end])?;
+            let mut d_bitmask = self.dev.alloc_zeros::<u64>(cur_frames * num_u64_per_frame)?;
+
+            let cfg = LaunchConfig {
+                grid_dim: (blocks_x as u32, 1, cur_frames as u32),
+                block_dim: (threads as u32, 1, 1),
+                shared_mem_bytes: 0,
+            };
+
+            unsafe {
+                contact_fn.clone().launch(
+                    cfg,
+                    (
+                        &d_coords,
+                        &mut d_bitmask,
+                        cutoff_sq,
+                        cur_frames as i32,
+                        num_res as i32,
+                        num_u64_per_frame as i32,
+                    ),
+                )?;
+            }
+
+            let chunk_res = self.dev.dtoh_sync_copy(&d_bitmask)?;
+            host_bitmask.extend_from_slice(&chunk_res);
         }
 
-        let host_bitmask = self.dev.dtoh_sync_copy(&d_bitmask)?;
         Ok(host_bitmask)
     }
 }
