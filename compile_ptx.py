@@ -4,10 +4,13 @@ import sys
 
 def main():
     try:
-        from cuda import nvrtc
-    except ImportError:
-        print("cuda-python not installed.")
-        return 1
+        from cuda.bindings import nvrtc
+    except Exception as e1:
+        try:
+            from cuda import nvrtc
+        except Exception as e2:
+            print(f"ImportError: {e1} / {e2}")
+            return 1
 
     cu_path = "src/cuda/kernels/qcp.cu"
     ptx_path = "src/cuda/kernels/qcp.ptx"
