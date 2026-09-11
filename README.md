@@ -2,7 +2,7 @@
 
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)]()
 [![Python Bindings](https://img.shields.io/badge/Python-PyO3_/_Maturin-blue.svg)]()
-[![PyPI Package](https://img.shields.io/badge/PyPI-v0.3.0-blue.svg)](https://pypi.org/project/strux-rs/)
+[![PyPI Package](https://img.shields.io/badge/PyPI-v0.3.1-blue.svg)](https://pypi.org/project/strux-rs/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
 `strux-rs` is a Rust library with Python bindings (PyO3 / NumPy) providing CPU- and GPU-accelerated algorithms for structural biology, molecular dynamics (MD) trajectory analysis, and multiple sequence alignment (MSA) preprocessing.
