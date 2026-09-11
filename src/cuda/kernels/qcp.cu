@@ -2,7 +2,6 @@
 // Pure registers, zero global memory allocations during solve, FP32 with double-precision accumulation.
 
 typedef unsigned long long uint64_t;
-typedef unsigned int size_t;
 
 extern "C" {
 
