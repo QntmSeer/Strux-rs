@@ -33,8 +33,10 @@ def main():
     opts = [b"--gpu-architecture=compute_75", b"-O3"]
     res = nvrtc.nvrtcCompileProgram(prog, len(opts), opts)
 
-    err, log = nvrtc.nvrtcGetProgramLog(prog)
-    log_str = log.decode("utf-8", errors="replace").strip()
+    err, log_size = nvrtc.nvrtcGetProgramLogSize(prog)
+    log_buf = bytearray(log_size)
+    err = nvrtc.nvrtcGetProgramLog(prog, log_buf)
+    log_str = log_buf.decode("utf-8", errors="replace").strip()
     if log_str:
         print("Compiler log:\n", log_str)
 
@@ -42,11 +44,13 @@ def main():
         print(f"Compilation failed with code: {res}")
         return 1
 
-    err, ptx = nvrtc.nvrtcGetPTX(prog)
+    err, ptx_size = nvrtc.nvrtcGetPTXSize(prog)
+    ptx_buf = bytearray(ptx_size)
+    err = nvrtc.nvrtcGetPTX(prog, ptx_buf)
     with open(ptx_path, "wb") as f:
-        f.write(ptx)
+        f.write(ptx_buf)
 
-    print(f"SUCCESS: Compiled {cu_path} -> {ptx_path} ({len(ptx)} bytes)")
+    print(f"SUCCESS: Compiled {cu_path} -> {ptx_path} ({len(ptx_buf)} bytes)")
     return 0
 
 if __name__ == "__main__":
