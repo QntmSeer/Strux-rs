@@ -30,7 +30,7 @@ def main():
         print(f"nvrtcCreateProgram error: {err}")
         return 1
 
-    opts = [b"--gpu-architecture=compute_75", b"-O3"]
+    opts = [b"--gpu-architecture=compute_75", b"--use_fast_math"]
     res = nvrtc.nvrtcCompileProgram(prog, len(opts), opts)
 
     err, log_size = nvrtc.nvrtcGetProgramLogSize(prog)
@@ -40,8 +40,9 @@ def main():
     if log_str:
         print("Compiler log:\n", log_str)
 
-    if res.value != 0:
-        print(f"Compilation failed with code: {res}")
+    res_code = res[0] if isinstance(res, tuple) else res
+    if getattr(res_code, "value", res_code) != 0:
+        print(f"Compilation failed with code: {res_code}")
         return 1
 
     err, ptx_size = nvrtc.nvrtcGetPTXSize(prog)
