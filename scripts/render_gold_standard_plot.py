@@ -21,7 +21,7 @@ plt.rcParams.update({
     'axes.facecolor': '#ffffff',
 })
 
-fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5.5), gridspec_kw={'width_ratios': [2.4, 0.9, 0.8]})
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(19, 5.5), gridspec_kw={'width_ratios': [2.6, 0.9, 1.1]})
 fig.suptitle('Gold-Standard Biological Dataset Benchmark: strux-rs vs. Established Tools', 
              fontweight='bold', fontsize=13, y=0.98)
 
@@ -38,18 +38,19 @@ packages_1 = [
     'strux-rs\n(1T CPU)', 
     'Google JAX\n(vmap JIT)', 
     'ProDy\n(C-Kabsch)', 
-    'strux-rs\n(16T CPU)'
+    'strux-rs\n(16T CPU)',
+    'strux-rs\n(CUDA GPU)'
 ]
-rates_1 = [446.6, 451.1, 5436.6, 10567.4, 26046.1, 39710.8, 43241.4, 76612.5, 92281.5, 596176.5]
-speedups_1 = ['1.0x', '1.0x', '12.2x', '23.7x', '58.3x', '88.9x', '96.8x', '172x', '207x', '1,335x']
+rates_1 = [446.6, 451.1, 5436.6, 10567.4, 26046.1, 39710.8, 43241.4, 76612.5, 92281.5, 596176.5, 1941698.0]
+speedups_1 = ['1.0x', '1.0x', '12.2x', '23.7x', '58.3x', '88.9x', '96.8x', '172x', '207x', '1,335x', '4,348x']
 colors_1 = [
     '#94a3b8', '#94a3b8', '#64748b', '#475569', '#334155', 
-    '#334155', '#2563eb', '#1e293b', '#0f172a', '#1d4ed8'
+    '#334155', '#2563eb', '#1e293b', '#0f172a', '#1d4ed8', '#0f766e'
 ]
 
 bars1 = ax1.bar(packages_1, rates_1, color=colors_1, width=0.62, edgecolor='#1e293b', linewidth=0.8)
 ax1.set_yscale('log')
-ax1.set_ylim(200, 1.5e6)
+ax1.set_ylim(200, 5.0e6)
 ax1.set_ylabel('Alignments / second (log scale)', fontweight='bold')
 ax1.set_title('A. Ubiquitin 2K39 Ensemble (116 models, 13.5k pairs)', fontweight='bold', pad=10, fontsize=11)
 ax1.grid(True, which='both', axis='y')
@@ -60,7 +61,7 @@ for bar, rate, sp in zip(bars1, rates_1, speedups_1):
     label = f'{rate:,.0f}/s\n({sp})'
     ax1.annotate(label, xy=(bar.get_x() + bar.get_width()/2, h),
                  xytext=(0, 4), textcoords="offset points",
-                 ha='center', va='bottom', fontsize=7.5, color='#111827')
+                 ha='center', va='bottom', fontsize=7.2, color='#111827')
 
 # ------------------------------------------------------------------------------
 # PANEL 2: Real GFP Trajectory Rg Dynamics (trajectory.pdb, 1,919 atoms)
@@ -86,25 +87,28 @@ for bar, rate, sp in zip(bars2, rates_2, speedups_2):
                  ha='center', va='bottom', fontsize=8, color='#111827')
 
 # ------------------------------------------------------------------------------
-# PANEL 3: Real Production Stockholm Ingestion (hmm_output.sto, 19.5 MB)
+# PANEL 3: Real Production Ingestion (Stockholm & AlphaFold BFD/Uniclust A3M)
 # ------------------------------------------------------------------------------
-packages_3 = ['Google AF / OF\n(Pure Python)', 'strux-rs\n(Zero-Copy FFI)']
-rates_3 = [199.5, 270.7]
-speedups_3 = ['1.0x (Ref)', '1.4x (271 MB/s)']
-colors_3 = ['#94a3b8', '#2563eb']
+labels_3 = ['Kinase (STO)\nAF/OpenFold', 'Kinase (STO)\nstrux-rs', 'BFD/Uni (A3M)\nAF/OpenFold', 'BFD/Uni (A3M)\nstrux-rs']
+times_3 = [97.8, 72.1, 2.42, 0.60]  # ms
+colors_3 = ['#94a3b8', '#2563eb', '#94a3b8', '#2563eb']
+speedups_3 = ['1.0x (Ref)', '1.4x (271 MB/s)', '1.0x (Ref)', '4.0x (0.60 ms)']
 
-bars3 = ax3.bar(packages_3, rates_3, color=colors_3, width=0.48, edgecolor='#1e293b', linewidth=0.8)
-ax3.set_ylim(0, 350)
-ax3.set_ylabel('Throughput (MB / s)', fontweight='bold')
-ax3.set_title('C. Real Kinase Stockholm (19.5 MB, 30k seqs)', fontweight='bold', pad=10, fontsize=11)
-ax3.grid(True, axis='y')
+bars3 = ax3.bar(labels_3, times_3, color=colors_3, width=0.55, edgecolor='#1e293b', linewidth=0.8)
+ax3.set_yscale('log')
+ax3.set_ylim(0.2, 200)
+ax3.set_ylabel('Parse Latency (ms, log scale)', fontweight='bold')
+ax3.set_title('C. Real Metagenomic MSA Parsing', fontweight='bold', pad=10, fontsize=11)
+ax3.grid(True, which='both', axis='y')
+ax3.tick_params(axis='x', rotation=20)
 
-for bar, rate, sp in zip(bars3, rates_3, speedups_3):
+for bar, t, sp in zip(bars3, times_3, speedups_3):
     h = bar.get_height()
-    label = f'{rate:.1f} MB/s\n({sp})'
+    label = f'{t:.2f} ms\n({sp})'
     ax3.annotate(label, xy=(bar.get_x() + bar.get_width()/2, h),
-                 xytext=(0, 5), textcoords="offset points",
-                 ha='center', va='bottom', fontsize=8.5, color='#111827')
+                 xytext=(0, 4), textcoords="offset points",
+                 ha='center', va='bottom', fontsize=7.5, color='#111827')
+
 
 plt.tight_layout()
 
