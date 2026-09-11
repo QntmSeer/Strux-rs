@@ -23,3 +23,7 @@ id_*
 # Benchmark data files (keep base trajectory.pdb)
 *.pdb
 !trajectory.pdb
+benchmarks/data/
+test_*.py
+*.dat
+

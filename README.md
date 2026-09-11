@@ -55,7 +55,31 @@ Under 3 continuous minutes of sustained 100% GPU computation (356.2 Million pair
 
 ![Hardware Soak Telemetry](hardware_soak_telemetry.png)
 
-### 4. MSA Parsing (250,000 sequences, 144.6 MB A3M)
+### 4. Real Gold-Standard Biological Datasets Benchmark
+Head-to-head comparison across standard computational biology packages executed on identical hardware (Intel Core i9-11950H 16T CPU, RTX A2000 Laptop GPU):
+
+| Task & Biological Target | Tool / Implementation | Runtime | Throughput | Speedup vs Ref |
+| :--- | :--- | :---: | :---: | :---: |
+| **Ubiquitin Solution Ensemble**<br>(`PDB 2K39`, 116 models, 13,456 pairs) | Biopython (SVD) | 30.13 s | 446.6 align/s | 1.0× (Baseline) |
+| | OpenFold / AlphaFold (Kabsch) | 29.83 s | 451.1 align/s | 1.0× |
+| | SciPy (`align_vectors`) | 2.48 s | 5,436.6 align/s | 12.2× |
+| | MDAnalysis (QCPROT) | 1.27 s | 10,567.4 align/s | 23.7× |
+| | MDTraj (C / AVX QCP) | 0.517 s | 26,046.1 align/s | 58.3× |
+| | Gemmi (C++ `superpose_positions`) | 0.339 s | 39,710.8 align/s | 88.9× |
+| | **`strux-rs` (1-Thread CPU)** | **0.311 s** | **43,241.4 align/s** | **96.8×** |
+| | Google JAX (`vmap JIT`) | 0.176 s | 76,612.5 align/s | 171.5× |
+| | ProDy (C-Kabsch) | 0.146 s | 92,281.5 align/s | 206.6× |
+| | **`strux-rs` (16-Thread Rayon CPU)** | **22.57 ms** | **596,176.5 align/s** | **1,335×** |
+| | **`strux-rs` (CUDA QCP GPU)** | **6.93 ms** | **1,941,698 align/s** | **4,348×** |
+| **GFP Trajectory Dynamics ($R_g$)**<br>(`trajectory.pdb`, 1,919 atoms) | MDAnalysis | 59.4 ms | 336.9 fps | 1.0× (Baseline) |
+| | MDTraj | 2.24 ms | 8,912.2 fps | 26.5× |
+| | **`strux-rs` (SIMD)** | **0.29 ms** | **68,770.8 fps** | **204×** |
+| **Human Kinase Domain Stockholm MSA**<br>(`hmm_output.sto`, 19.5 MB, 30,574 seqs) | OpenFold / AlphaFold (Pure Python) | 97.8 ms | 199.5 MB/s | 1.0× (Baseline) |
+| | **`strux-rs` (Zero-Copy FFI)** | **72.1 ms** | **270.7 MB/s** | **1.4×** |
+
+![Gold-Standard Ecosystem Benchmark](benchmarks/gold_standard_comparison.png)
+
+### 5. Large-Scale Synthetic MSA Parsing (250,000 sequences, 144.6 MB A3M)
 
 | Implementation | Time | Throughput | Peak Memory Delta |
 | :--- | :---: | :---: | :---: |
