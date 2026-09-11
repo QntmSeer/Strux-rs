@@ -37,7 +37,7 @@ def main():
         t_cpu = time.perf_counter() - t0
         print(f"CPU All-to-all Kabsch ({n_test} frames, {n_test*(n_test-1)//2} alignments): {t_cpu:.4f}s")
         print(f"Projected CPU time for 50,000 frames: {(t_cpu / (n_test*(n_test-1)/2) * (50000*49999/2)) / 3600:.2f} hours.")
-        print("\nSUCCESS: Baseline ready. Deploy to GPU workstation (agni) to execute CUDA QCP acceleration.")
+        print("\nSUCCESS: Baseline ready. Deploy to a CUDA-enabled GPU system to execute CUDA QCP acceleration.")
         return
 
     # CUDA is available!

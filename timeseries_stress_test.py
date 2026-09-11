@@ -12,7 +12,10 @@ def main():
     print("=" * 80)
 
     # 1. Load real base protein structure
-    base_traj = strux_rs.parse_pdb("trajectory.pdb")
+    pdb_path = "trajectory.pdb"
+    if not os.path.exists(pdb_path):
+        pdb_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trajectory.pdb")
+    base_traj = strux_rs.parse_pdb(pdb_path)
     num_atoms = base_traj.shape[1]
     base_frame = base_traj[0]
     num_cpus = os.cpu_count() or 16

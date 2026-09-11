@@ -36,7 +36,10 @@ def main():
     print("=" * 80)
 
     # 1. Load base structure (1,919 atoms)
-    base_traj = strux_rs.parse_pdb("trajectory.pdb")
+    pdb_path = "trajectory.pdb"
+    if not os.path.exists(pdb_path):
+        pdb_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "trajectory.pdb")
+    base_traj = strux_rs.parse_pdb(pdb_path)
     base_frame = base_traj[0]
     num_atoms = base_frame.shape[0]
 
