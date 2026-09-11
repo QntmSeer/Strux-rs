@@ -22,10 +22,7 @@ def main():
     with open(cu_path, "rb") as f:
         src = f.read()
 
-    # NVRTC doesn't need cuda_runtime.h header included
-    src_cleaned = src.replace(b"#include <cuda_runtime.h>", b"")
-
-    err, prog = nvrtc.nvrtcCreateProgram(src_cleaned, b"qcp.cu", 0, [], [])
+    err, prog = nvrtc.nvrtcCreateProgram(src, b"qcp.cu", 0, [], [])
     if err.value != 0:
         print(f"nvrtcCreateProgram error: {err}")
         return 1

@@ -1,9 +1,8 @@
 // ponytail: CUDA QCP Trajectory Engine (Theobald Quaternion Characteristic Polynomial)
 // Pure registers, zero global memory allocations during solve, FP32 with double-precision accumulation.
 
-#include <cuda_runtime.h>
-#include <math.h>
-#include <stdint.h>
+typedef unsigned long long uint64_t;
+typedef unsigned int size_t;
 
 extern "C" {
 
