@@ -1,11 +1,17 @@
 // ponytail: pyo3 module glue, minimal code, fast array conversions.
 use numpy::{PyArray3, PyArrayMethods, PyReadonlyArray2, PyReadonlyArray3};
+#[cfg(feature = "cuda")]
+use numpy::{PyArray1, PyArray2};
 use pyo3::prelude::*;
 
 pub mod analysis;
 pub mod msa;
 pub mod pdb;
 pub mod spatial;
+
+#[cfg(feature = "cuda")]
+pub mod cuda;
+
 
 pub use msa::Msa;
 
@@ -179,6 +185,115 @@ fn parse_stockholm_file(py: Python<'_>, path: &str) -> PyResult<Msa> {
     }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))
 }
 
+#[pyfunction]
+fn cuda_is_available() -> bool {
+    #[cfg(feature = "cuda")]
+    {
+        cuda::GpuTrajectoryEngine::new(0).is_ok()
+    }
+    #[cfg(not(feature = "cuda"))]
+    {
+        false
+    }
+}
+
+#[cfg(feature = "cuda")]
+#[pyfunction]
+fn cuda_pairwise_rmsd(
+    py: Python<'_>,
+    trajectory: PyReadonlyArray3<'_, f32>,
+) -> PyResult<Py<PyArray2<f32>>> {
+    let view = trajectory.as_array();
+    let shape = view.shape();
+    let num_frames = shape[0];
+    let num_atoms = shape[1];
+
+    let slice = view.as_slice().ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
+    })?;
+
+    let engine = cuda::GpuTrajectoryEngine::new(0)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+
+    let dist = py.allow_threads(|| {
+        engine.pairwise_rmsd(slice, num_frames, num_atoms)
+    }).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA execution error: {:?}", e)))?;
+
+    let out_array = PyArray2::<f32>::zeros_bound(py, [num_frames, num_frames], false);
+    {
+        let mut writer = out_array.readwrite();
+        let target_slice = writer.as_slice_mut().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Buffer write error: {:?}", e))
+        })?;
+        target_slice.copy_from_slice(&dist);
+    }
+    Ok(out_array.into())
+}
+
+#[cfg(feature = "cuda")]
+#[pyfunction]
+fn cuda_cluster_daura(
+    py: Python<'_>,
+    trajectory: PyReadonlyArray3<'_, f32>,
+    cutoff: f32,
+) -> PyResult<(Py<PyArray1<i32>>, Py<PyArray1<i32>>)> {
+    let view = trajectory.as_array();
+    let shape = view.shape();
+    let num_frames = shape[0];
+    let num_atoms = shape[1];
+
+    let slice = view.as_slice().ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
+    })?;
+
+    let engine = cuda::GpuTrajectoryEngine::new(0)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+
+    let (labels, centroids) = py.allow_threads(|| {
+        engine.cluster_daura(slice, num_frames, num_atoms, cutoff)
+    }).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA clustering error: {:?}", e)))?;
+
+    let out_labels = PyArray1::<i32>::from_vec_bound(py, labels);
+    let out_centroids = PyArray1::<i32>::from_vec_bound(py, centroids);
+
+    Ok((out_labels.into(), out_centroids.into()))
+}
+
+#[cfg(feature = "cuda")]
+#[pyfunction]
+fn cuda_contact_map_bitmask(
+    py: Python<'_>,
+    trajectory: PyReadonlyArray3<'_, f32>,
+    cutoff: f32,
+) -> PyResult<Py<PyArray2<u64>>> {
+    let view = trajectory.as_array();
+    let shape = view.shape();
+    let num_frames = shape[0];
+    let num_res = shape[1];
+
+    let slice = view.as_slice().ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
+    })?;
+
+    let engine = cuda::GpuTrajectoryEngine::new(0)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+
+    let bitmasks = py.allow_threads(|| {
+        engine.contact_map_bitmask(slice, num_frames, num_res, cutoff)
+    }).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA contact error: {:?}", e)))?;
+
+    let num_u64_per_frame = (num_res * num_res + 63) / 64;
+    let out_array = PyArray2::<u64>::zeros_bound(py, [num_frames, num_u64_per_frame], false);
+    {
+        let mut writer = out_array.readwrite();
+        let target_slice = writer.as_slice_mut().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Buffer write error: {:?}", e))
+        })?;
+        target_slice.copy_from_slice(&bitmasks);
+    }
+    Ok(out_array.into())
+}
+
 #[pymodule]
 fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Msa>()?;
@@ -192,5 +307,14 @@ fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_a3m_file, m)?)?;
     m.add_function(wrap_pyfunction!(parse_stockholm, m)?)?;
     m.add_function(wrap_pyfunction!(parse_stockholm_file, m)?)?;
+
+    m.add_function(wrap_pyfunction!(cuda_is_available, m)?)?;
+    #[cfg(feature = "cuda")]
+    {
+        m.add_function(wrap_pyfunction!(cuda_pairwise_rmsd, m)?)?;
+        m.add_function(wrap_pyfunction!(cuda_cluster_daura, m)?)?;
+        m.add_function(wrap_pyfunction!(cuda_contact_map_bitmask, m)?)?;
+    }
     Ok(())
 }
+
