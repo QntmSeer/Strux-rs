@@ -2,10 +2,10 @@
 
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)]()
 [![Python Bindings](https://img.shields.io/badge/Python-PyO3_/_Maturin-blue.svg)]()
-[![PyPI Package](https://img.shields.io/badge/PyPI-v0.2.3-blue.svg)](https://pypi.org/project/strux-rs/)
+[![PyPI Package](https://img.shields.io/badge/PyPI-v0.3.0-blue.svg)](https://pypi.org/project/strux-rs/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
-> **strux-rs** is a blazingly fast, performance-engineered structural biology library written in Rust, offering direct, zero-copy Python bindings via PyO3 and NumPy.
+> **strux-rs** is a blazingly fast, performance-engineered structural biology library written in Rust, offering direct, zero-copy Python bindings via PyO3 and NumPy with native NVIDIA CUDA GPU acceleration.
 
 It acts as a drop-in accelerator for slow CPU-bound bottlenecks in protein folding pipelines (AlphaFold / OpenFold), molecular dynamics (MD) trajectory analysis, and generative structural biology workflows.
 
@@ -13,7 +13,13 @@ It acts as a drop-in accelerator for slow CPU-bound bottlenecks in protein foldi
 
 ## Performance Speedups (Workstation Benchmarks)
 
-*All benchmarks measured on Linux Workstation `agni` (Intel Core i9-11950H @ 2.60GHz, 16 Cores, 62 GB RAM).*
+*All benchmarks measured on Linux Workstation `agni` (Intel Core i9-11950H @ 2.60GHz, 16 Cores, 62 GB RAM, NVIDIA RTX A2000 Laptop GPU).*
+
+### 0. GPU CUDA & 16-Core Rayon Trajectory Scaling
+* **2,054,488 pairwise QCP structural alignments / sec** on the RTX A2000 GPU (over **1,200× faster** than single-core CPU, **3.9× faster** than all 16 Core i9 threads).
+* **14.1× linear multi-thread scaling** via native Rayon on 16 CPU cores (502,477 frames/sec).
+* **Numerical Parity**: Max deviation of $2.67 \times 10^{-5} \text{ \AA}$ against CPU SVD Kabsch.
+* **Bounded VRAM Streaming**: Prevents OOM errors on 4 GB laptop GPUs across 10,000+ frames.
 
 ### 1. MSA Parsing & Preprocessing (OpenFold / AlphaFold Bottleneck)
 Benchmark performed on a **250,000 sequence (144.6 MB `.a3m` file)** dataset:
