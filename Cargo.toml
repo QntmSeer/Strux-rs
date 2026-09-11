@@ -13,7 +13,7 @@ numpy = "0.21.0"
 rayon = "1.10.0"
 nalgebra = { version = "0.33.0", default-features = false, features = ["std"] }
 memmap2 = "0.9.5"
-cudarc = { version = "0.11", optional = true, default-features = false, features = ["driver", "cuda-version-from-build-system"] }
+cudarc = { version = "0.11", optional = true, default-features = false, features = ["driver", "cuda-12050"] }
 
 [features]
 default = []
