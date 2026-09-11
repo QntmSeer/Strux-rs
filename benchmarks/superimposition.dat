@@ -1,0 +1,5 @@
+﻿# Method AlignmentsPerSec TimeSec Speedup
+"OpenFold\n(Biopython)" 203.4 4.9164 1.0
+"strux-rs\n(1T CPU)" 27067.5 0.0369 133.1
+"strux-rs\n(16T CPU)" 200423.5 0.00499 985.4
+"strux-rs\n(CUDA GPU)" 1411867.9 0.000708 6941.0

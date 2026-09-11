@@ -175,9 +175,14 @@ pub fn parse_a3m_bytes(bytes: &[u8]) -> Msa {
     let mut aligned_sequences = Vec::with_capacity(num_seqs);
     let mut deletion_matrix_flat = Vec::with_capacity(num_seqs * num_res);
 
-    for (header, aligned_seq, deletion_vec) in results {
+    for (header, aligned_seq, mut deletion_vec) in results {
         descriptions.push(header);
         aligned_sequences.push(aligned_seq);
+        if deletion_vec.len() < num_res {
+            deletion_vec.resize(num_res, 0);
+        } else if deletion_vec.len() > num_res {
+            deletion_vec.truncate(num_res);
+        }
         deletion_matrix_flat.extend(deletion_vec);
     }
 

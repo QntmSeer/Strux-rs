@@ -1,0 +1,3 @@
+﻿# Method SeqsPerSec DataThroughputMBs TimeSec Speedup
+"OpenFold\n(Pure Python)" 60731.9 9.8 0.4116 1.0
+"strux-rs\n(Zero-Copy FFI)" 1199503.2 193.4 0.0208 19.8
