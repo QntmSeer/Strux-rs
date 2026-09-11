@@ -1,1 +1,25 @@
 /target
+
+# Python & build artifacts
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Credentials, keys, and environment files
+.env
+.env.*
+*.pem
+*.key
+*.token
+id_*
+
+# Distribution packages
+*.whl
+*.tar.gz
+
+# Benchmark data files (keep base trajectory.pdb)
+*.pdb
+!trajectory.pdb
