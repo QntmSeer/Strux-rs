@@ -32,13 +32,14 @@ __global__ void center_and_norms_kernel(
     float mean_x = (float)(cx * inv_n);
     float mean_y = (float)(cy * inv_n);
     float mean_z = (float)(cz * inv_n);
+    float scale = rsqrtf((float)num_atoms);
 
-    // 2. Subtract centroid & compute sum of squared coordinates
+    // 2. Subtract centroid, scale by 1/sqrt(num_atoms), & compute sum of squared coordinates
     double sum_sq = 0.0;
     for (int a = 0; a < num_atoms; ++a) {
-        float x = in_frame[a * 3 + 0] - mean_x;
-        float y = in_frame[a * 3 + 1] - mean_y;
-        float z = in_frame[a * 3 + 2] - mean_z;
+        float x = (in_frame[a * 3 + 0] - mean_x) * scale;
+        float y = (in_frame[a * 3 + 1] - mean_y) * scale;
+        float z = (in_frame[a * 3 + 2] - mean_z) * scale;
 
         out_frame[a * 3 + 0] = x;
         out_frame[a * 3 + 1] = y;
@@ -53,17 +54,17 @@ __global__ void center_and_norms_kernel(
 // ============================================================================
 // Helper: 4x4 symmetric matrix determinant in registers
 // ============================================================================
-__device__ __forceinline__ float det4x4_sym(
-    float k00, float k01, float k02, float k03,
-    float k11, float k12, float k13,
-    float k22, float k23,
-    float k33
+__device__ __forceinline__ double det4x4_sym(
+    double k00, double k01, double k02, double k03,
+    double k11, double k12, double k13,
+    double k22, double k23,
+    double k33
 ) {
     // Sub-determinants for row 0
-    float m00 = k11 * (k22 * k33 - k23 * k23) - k12 * (k12 * k33 - k23 * k13) + k13 * (k12 * k23 - k22 * k13);
-    float m01 = k01 * (k22 * k33 - k23 * k23) - k12 * (k02 * k33 - k23 * k03) + k13 * (k02 * k23 - k22 * k03);
-    float m02 = k01 * (k12 * k33 - k13 * k23) - k11 * (k02 * k33 - k23 * k03) + k13 * (k02 * k13 - k12 * k03);
-    float m03 = k01 * (k12 * k23 - k13 * k22) - k11 * (k02 * k23 - k22 * k03) + k12 * (k02 * k13 - k12 * k03);
+    double m00 = k11 * (k22 * k33 - k23 * k23) - k12 * (k12 * k33 - k23 * k13) + k13 * (k12 * k23 - k22 * k13);
+    double m01 = k01 * (k22 * k33 - k23 * k23) - k12 * (k02 * k33 - k23 * k03) + k13 * (k02 * k23 - k22 * k03);
+    double m02 = k01 * (k12 * k33 - k13 * k23) - k11 * (k02 * k33 - k23 * k03) + k13 * (k02 * k13 - k12 * k03);
+    double m03 = k01 * (k12 * k23 - k13 * k22) - k11 * (k02 * k23 - k22 * k03) + k12 * (k02 * k13 - k12 * k03);
 
     return k00 * m00 - k01 * m01 + k02 * m02 - k03 * m03;
 }
@@ -129,52 +130,52 @@ __global__ void pairwise_qcp_tiled_kernel(
         Szz += (double)pz * qz;
     }
 
-    // 2. Construct 4x4 Key Matrix K
-    float k00 = (float)(Sxx + Syy + Szz);
-    float k11 = (float)(Sxx - Syy - Szz);
-    float k22 = (float)(-Sxx + Syy - Szz);
-    float k33 = (float)(-Sxx - Syy + Szz);
+    // 2. Construct 4x4 Key Matrix K in double
+    double k00 = Sxx + Syy + Szz;
+    double k11 = Sxx - Syy - Szz;
+    double k22 = -Sxx + Syy - Szz;
+    double k33 = -Sxx - Syy + Szz;
 
-    float k01 = (float)(Syz - Szy);
-    float k02 = (float)(Szx - Sxz);
-    float k03 = (float)(Sxy - Syx);
+    double k01 = Syz - Szy;
+    double k02 = Szx - Sxz;
+    double k03 = Sxy - Syx;
 
-    float k12 = (float)(Sxy + Syx);
-    float k13 = (float)(Szx + Sxz);
-    float k23 = (float)(Syz + Szy);
+    double k12 = Sxy + Syx;
+    double k13 = Szx + Sxz;
+    double k23 = Syz + Szy;
 
-    // 3. Characteristic polynomial coefficients:
+    // 3. Characteristic polynomial coefficients in double:
     // P(lambda) = lambda^4 - 2*c2*lambda^2 - 8*c1*lambda + c0
-    float c2 = (float)(Sxx*Sxx + Sxy*Sxy + Sxz*Sxz +
-                       Syx*Syx + Syy*Syy + Syz*Syz +
-                       Szx*Szx + Szy*Szy + Szz*Szz);
+    double c2 = Sxx*Sxx + Sxy*Sxy + Sxz*Sxz +
+                Syx*Syx + Syy*Syy + Syz*Syz +
+                Szx*Szx + Szy*Szy + Szz*Szz;
 
     // Determinant of S (3x3)
-    float c1 = (float)(Sxx * (Syy * Szz - Syz * Szy) -
-                       Sxy * (Syx * Szz - Syz * Szx) +
-                       Sxz * (Syx * Szy - Syy * Szx));
+    double c1 = Sxx * (Syy * Szz - Syz * Szy) -
+                Sxy * (Syx * Szz - Syz * Szx) +
+                Sxz * (Syx * Szy - Syy * Szx);
 
-    float c0 = det4x4_sym(k00, k01, k02, k03, k11, k12, k13, k22, k23, k33);
+    double c0 = det4x4_sym(k00, k01, k02, k03, k11, k12, k13, k22, k23, k33);
 
-    // 4. Initial guess: (G_P + G_Q) / 2
-    float Gp = norms[i];
-    float Gq = norms[j];
-    float lambda = 0.5f * (Gp + Gq);
+    // 4. Initial guess: (G_P + G_Q) / 2 in double
+    double Gp = (double)norms[i];
+    double Gq = (double)norms[j];
+    double lambda = 0.5 * (Gp + Gq);
 
     // 5. Newton-Raphson iterations (monotonically converges to lambda_max)
     #pragma unroll
-    for (int iter = 0; iter < 4; ++iter) {
-        float l2 = lambda * lambda;
-        float f = l2 * l2 - 2.0f * c2 * l2 - 8.0f * c1 * lambda + c0;
-        float f_prime = 4.0f * (l2 * lambda - c2 * lambda - 2.0f * c1);
-        if (fabsf(f_prime) > 1e-7f) {
+    for (int iter = 0; iter < 12; ++iter) {
+        double l2 = lambda * lambda;
+        double f = l2 * l2 - 2.0 * c2 * l2 - 8.0 * c1 * lambda + c0;
+        double f_prime = 4.0 * (l2 * lambda - c2 * lambda - 2.0 * c1);
+        if (fabs(f_prime) > 1e-12) {
             lambda -= f / f_prime;
         }
     }
 
-    // 6. RMSD with floating-point underflow clamp
-    float diff = (Gp + Gq - 2.0f * lambda) / (float)num_atoms;
-    float rmsd = sqrtf(fmaxf(0.0f, diff));
+    // 6. RMSD with floating-point underflow clamp (already normalized by 1/sqrt(num_atoms))
+    double diff = Gp + Gq - 2.0 * lambda;
+    float rmsd = (float)sqrt(diff > 0.0 ? diff : 0.0);
 
     dist_matrix[(size_t)local_r * tile_cols + local_c] = rmsd;
 }

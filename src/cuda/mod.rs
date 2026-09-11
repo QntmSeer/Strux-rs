@@ -127,7 +127,7 @@ impl GpuTrajectoryEngine {
         loop {
             // Count unassigned neighbors for all frames
             unsafe {
-                count_fn.launch(
+                count_fn.clone().launch(
                     cfg,
                     (&d_dist, &d_assigned, &mut d_counts, cutoff, num_frames as i32),
                 )?;
