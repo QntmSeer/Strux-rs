@@ -2,18 +2,8 @@
 import os
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import strux_rs
-
-def cpu_worker_rmsd_chunk(args):
-    """Worker function for multi-process CPU Kabsch to peg all 16 cores."""
-    chunk_pairs, f1_arr, f2_arr = args
-    results = []
-    for idx1, idx2 in chunk_pairs:
-        r = strux_rs.calculate_rmsd_kabsch(f1_arr[idx1], f2_arr[idx2])
-        results.append(r)
-    return results
 
 def main():
     print("=" * 80)
@@ -52,20 +42,11 @@ def main():
     t_cpu_1d = time.perf_counter() - t0
     print(f"CPU Single-Thread Time: {t_cpu_1d:.4f}s ({T_steps / t_cpu_1d:,.1f} frames/s)")
 
-    # CPU 16-Core Parallel
+    # CPU 16-Core Native Rayon Parallel
     t0 = time.perf_counter()
-    chunk_size = T_steps // num_cpus
-    tasks = []
-    for c in range(num_cpus):
-        start = c * chunk_size
-        end = T_steps if c == num_cpus - 1 else (c + 1) * chunk_size
-        pairs = [(0, t) for t in range(start, end)]
-        tasks.append((pairs, time_series, time_series))
-
-    with ProcessPoolExecutor(max_workers=num_cpus) as executor:
-        _ = list(executor.map(cpu_worker_rmsd_chunk, tasks))
+    cpu_rayon_1d = strux_rs.cpu_trajectory_rmsd(time_series, time_series[0])
     t_cpu_multi = time.perf_counter() - t0
-    print(f"CPU 16-Core Multi-Thread Time: {t_cpu_multi:.4f}s ({T_steps / t_cpu_multi:,.1f} frames/s) [Speedup: {t_cpu_1d / t_cpu_multi:.1f}x over 1-core]")
+    print(f"CPU 16-Core Rayon Parallel Time: {t_cpu_multi:.4f}s ({T_steps / t_cpu_multi:,.1f} frames/s) [Speedup: {t_cpu_1d / t_cpu_multi:.1f}x over 1-core]")
 
     # =========================================================================
     # WORKLOAD 2: Sliding Window Transition Matrix (O(T * W))
@@ -74,33 +55,23 @@ def main():
     W = 250
     print("\n" + "-" * 80)
     print(f"WORKLOAD 2: Sliding Window Local Transition Matrix (Window W = {W}, 1,000 Time Windows)")
-    print(f"Total pairwise alignments: {1000 * W:,d} pairs")
+    print(f"Total pairwise alignments: {W * W:,d} pairs")
     print("-" * 80)
 
     window_traj = time_series[:W]  # [250, N, 3]
+    total_w_pairs = W * W
 
-    # CPU Multi-Core
+    # CPU 16-Core Native Rayon Parallel
     t0 = time.perf_counter()
-    all_pairs = []
-    for i in range(W):
-        for j in range(W):
-            all_pairs.append((i, j))
-    chunk_size = len(all_pairs) // num_cpus
-    tasks = []
-    for c in range(num_cpus):
-        start = c * chunk_size
-        end = len(all_pairs) if c == num_cpus - 1 else (c + 1) * chunk_size
-        tasks.append((all_pairs[start:end], window_traj, window_traj))
-    with ProcessPoolExecutor(max_workers=num_cpus) as executor:
-        _ = list(executor.map(cpu_worker_rmsd_chunk, tasks))
+    cpu_mat = strux_rs.cpu_pairwise_rmsd(window_traj)
     t_cpu_window = time.perf_counter() - t0
-    print(f"CPU 16-Core Window Time: {t_cpu_window:.4f}s ({len(all_pairs) / t_cpu_window:,.1f} pairs/s)")
+    print(f"CPU 16-Core Rayon Window Time: {t_cpu_window:.4f}s ({total_w_pairs / t_cpu_window:,.1f} pairs/s)")
 
     # GPU
     t0 = time.perf_counter()
     _ = strux_rs.cuda_pairwise_rmsd(window_traj)
     t_gpu_window = time.perf_counter() - t0
-    print(f"GPU RTX A2000 Window Time: {t_gpu_window:.4f}s ({len(all_pairs) / t_gpu_window:,.1f} pairs/s)")
+    print(f"GPU RTX A2000 Window Time: {t_gpu_window:.4f}s ({total_w_pairs / t_gpu_window:,.1f} pairs/s)")
     print(f"GPU vs 16-Core CPU Speedup: {t_cpu_window / t_gpu_window:.1f}x")
 
     # =========================================================================
@@ -117,15 +88,23 @@ def main():
         sub_traj = time_series[:n_t]
         total_p = n_t * n_t
 
-        # 16-Core CPU estimate from calibrated multi-core throughput
-        cpu_multicore_rate = len(all_pairs) / t_cpu_window
-        cpu_equiv_sec = total_p / cpu_multicore_rate
-        if cpu_equiv_sec < 60:
-            cpu_str = f"{cpu_equiv_sec:.1f}s"
-        elif cpu_equiv_sec < 3600:
-            cpu_str = f"{cpu_equiv_sec / 60:.1f} min"
+        # For 1,000 frames (1,000,000 pairs), run actual 16-core CPU Rayon
+        if n_t == 1000:
+            t0 = time.perf_counter()
+            _ = strux_rs.cpu_pairwise_rmsd(sub_traj)
+            t_cpu_act = time.perf_counter() - t0
+            cpu_equiv_sec = t_cpu_act
+            cpu_str = f"{t_cpu_act:.2f}s (actual)"
+            cpu_rate = total_p / t_cpu_act
         else:
-            cpu_str = f"{cpu_equiv_sec / 3600:.2f} hours"
+            # Scaled from actual 16-core CPU rate
+            cpu_equiv_sec = total_p / cpu_rate
+            if cpu_equiv_sec < 60:
+                cpu_str = f"{cpu_equiv_sec:.1f}s (est)"
+            elif cpu_equiv_sec < 3600:
+                cpu_str = f"{cpu_equiv_sec / 60:.1f} min"
+            else:
+                cpu_str = f"{cpu_equiv_sec / 3600:.2f} hours"
 
         # GPU actual run
         t0 = time.perf_counter()

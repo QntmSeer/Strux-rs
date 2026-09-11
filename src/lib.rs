@@ -1,8 +1,7 @@
 // ponytail: pyo3 module glue, minimal code, fast array conversions.
-use numpy::{PyArray3, PyArrayMethods, PyReadonlyArray2, PyReadonlyArray3};
-#[cfg(feature = "cuda")]
-use numpy::{PyArray1, PyArray2};
+use numpy::{PyArray1, PyArray2, PyArray3, PyArrayMethods, PyReadonlyArray2, PyReadonlyArray3};
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 pub mod analysis;
 pub mod msa;
@@ -105,6 +104,104 @@ fn calculate_rmsd_kabsch(
         analysis::calculate_rmsd_kabsch(&v1, &v2)
     })
 }
+
+// ponytail: native Rayon multi-threaded 1-vs-T trajectory RMSD, pegging all CPU cores.
+#[pyfunction]
+fn cpu_trajectory_rmsd(
+    py: Python<'_>,
+    trajectory: PyReadonlyArray3<'_, f32>,
+    reference: PyReadonlyArray2<'_, f32>,
+) -> PyResult<Py<PyArray1<f32>>> {
+    let view = trajectory.as_array();
+    let ref_view = reference.as_array();
+    let shape = view.shape();
+    let num_frames = shape[0];
+    let num_atoms = shape[1];
+
+    let slice = view.as_slice().ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
+    })?;
+    let ref_slice = ref_view.as_slice().ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("Reference array must be contiguous C-order")
+    })?;
+
+    let stride = num_atoms * 3;
+    let ref_coords: &[[f32; 3]] = unsafe {
+        std::slice::from_raw_parts(ref_slice.as_ptr() as *const [f32; 3], num_atoms)
+    };
+
+    let rmsds: Vec<f32> = py.allow_threads(|| {
+        (0..num_frames)
+            .into_par_iter()
+            .map(|i| {
+                let frame: &[[f32; 3]] = unsafe {
+                    std::slice::from_raw_parts(
+                        slice[i * stride..].as_ptr() as *const [f32; 3],
+                        num_atoms,
+                    )
+                };
+                analysis::calculate_rmsd_kabsch(frame, ref_coords)
+            })
+            .collect()
+    });
+
+    let out = PyArray1::<f32>::from_vec_bound(py, rmsds);
+    Ok(out.into())
+}
+
+// ponytail: native Rayon multi-threaded all-to-all pairwise RMSD across all available CPU threads.
+#[pyfunction]
+fn cpu_pairwise_rmsd(
+    py: Python<'_>,
+    trajectory: PyReadonlyArray3<'_, f32>,
+) -> PyResult<Py<PyArray2<f32>>> {
+    let view = trajectory.as_array();
+    let shape = view.shape();
+    let num_frames = shape[0];
+    let num_atoms = shape[1];
+
+    let slice = view.as_slice().ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
+    })?;
+
+    let stride = num_atoms * 3;
+    let matrix: Vec<f32> = py.allow_threads(|| {
+        (0..num_frames * num_frames)
+            .into_par_iter()
+            .map(|idx| {
+                let i = idx / num_frames;
+                let j = idx % num_frames;
+                if i == j {
+                    return 0.0;
+                }
+                let f1: &[[f32; 3]] = unsafe {
+                    std::slice::from_raw_parts(
+                        slice[i * stride..].as_ptr() as *const [f32; 3],
+                        num_atoms,
+                    )
+                };
+                let f2: &[[f32; 3]] = unsafe {
+                    std::slice::from_raw_parts(
+                        slice[j * stride..].as_ptr() as *const [f32; 3],
+                        num_atoms,
+                    )
+                };
+                analysis::calculate_rmsd_kabsch(f1, f2)
+            })
+            .collect()
+    });
+
+    let out_array = PyArray2::<f32>::zeros_bound(py, [num_frames, num_frames], false);
+    unsafe {
+        let target_slice = out_array.as_slice_mut().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Buffer write error: {:?}", e))
+        })?;
+        target_slice.copy_from_slice(&matrix);
+    }
+    Ok(out_array.into())
+}
+
+
 
 #[pyfunction]
 fn calculate_rmsf(py: Python<'_>, trajectory: PyReadonlyArray3<'_, f32>) -> Vec<f32> {
@@ -301,6 +398,8 @@ fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calculate_rg, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_raw, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_kabsch, m)?)?;
+    m.add_function(wrap_pyfunction!(cpu_trajectory_rmsd, m)?)?;
+    m.add_function(wrap_pyfunction!(cpu_pairwise_rmsd, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsf, m)?)?;
     m.add_function(wrap_pyfunction!(find_interface_contacts, m)?)?;
     m.add_function(wrap_pyfunction!(parse_a3m, m)?)?;
