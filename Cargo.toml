@@ -2,6 +2,9 @@
 name = "strux-rs"
 version = "0.3.1"
 edition = "2021"
+authors = ["QntmSeer <qntmqrks@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/QntmSeer/strux-rs"
 
 [lib]
 name = "strux_rs"
