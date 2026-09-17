@@ -251,4 +251,45 @@ __global__ void contact_map_bitmask_kernel(
     bitmask_out[(size_t)frame_idx * num_u64_per_frame + u64_idx] = mask;
 }
 
+// ============================================================================
+// 5. Contact Frequency Matrix Kernel (Dense Float Output)
+// Computes ensemble contact frequencies [num_res, num_res] directly on GPU
+// ============================================================================
+__global__ void contact_frequency_kernel(
+    const float* __restrict__ coords,        // [num_frames, num_res, 3]
+    float* __restrict__ contact_freq_out,    // [num_res, num_res]
+    float cutoff_sq,
+    int num_frames,
+    int num_res
+) {
+    int r1 = blockIdx.y * blockDim.y + threadIdx.y;
+    int r2 = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (r1 >= num_res || r2 >= num_res) return;
+
+    if (r1 > r2) {
+        // Enforce upper triangular calculation to avoid duplicate work; lower triangle mirrored
+        return;
+    }
+
+    float inv_frames = 1.0f / (float)num_frames;
+    int contact_count = 0;
+
+    for (int f = 0; f < num_frames; ++f) {
+        const float* f_coords = coords + (size_t)f * num_res * 3;
+        float dx = f_coords[r1 * 3 + 0] - f_coords[r2 * 3 + 0];
+        float dy = f_coords[r1 * 3 + 1] - f_coords[r2 * 3 + 1];
+        float dz = f_coords[r1 * 3 + 2] - f_coords[r2 * 3 + 2];
+        float d_sq = dx * dx + dy * dy + dz * dz;
+        if (d_sq <= cutoff_sq) {
+            contact_count++;
+        }
+    }
+
+    float freq = (float)contact_count * inv_frames;
+    contact_freq_out[(size_t)r1 * num_res + r2] = freq;
+    contact_freq_out[(size_t)r2 * num_res + r1] = freq;
+}
+
 } // extern "C"
+

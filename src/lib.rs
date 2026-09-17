@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use rayon::prelude::*;
 
 pub mod analysis;
+pub mod dcd;
 pub mod msa;
 pub mod pdb;
 pub mod spatial;
@@ -11,8 +12,8 @@ pub mod spatial;
 #[cfg(feature = "cuda")]
 pub mod cuda;
 
-
 pub use msa::Msa;
+
 
 #[pyfunction]
 fn parse_pdb(py: Python<'_>, path: &str) -> PyResult<Py<PyArray3<f32>>> {
@@ -45,6 +46,28 @@ fn parse_pdb(py: Python<'_>, path: &str) -> PyResult<Py<PyArray3<f32>>> {
     }
     Ok(array.into())
 }
+
+#[pyfunction]
+fn parse_dcd(py: Python<'_>, path: &str) -> PyResult<Py<PyArray3<f32>>> {
+    let path_str = path.to_string();
+    let dcd_traj = py.allow_threads(|| {
+        dcd::parse_dcd_trajectory(path_str)
+    }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+
+    if dcd_traj.num_frames == 0 || dcd_traj.num_atoms == 0 {
+        let array = PyArray3::<f32>::zeros_bound(py, [0, 0, 3], false);
+        return Ok(array.into());
+    }
+
+    let array = PyArray3::<f32>::zeros_bound(py, [dcd_traj.num_frames, dcd_traj.num_atoms, 3], false);
+    {
+        let mut writer = array.readwrite();
+        let slice = writer.as_slice_mut().unwrap();
+        slice.copy_from_slice(&dcd_traj.coords);
+    }
+    Ok(array.into())
+}
+
 
 #[pyfunction]
 fn calculate_rg(py: Python<'_>, coords: PyReadonlyArray2<'_, f32>) -> f32 {
@@ -391,10 +414,47 @@ fn cuda_contact_map_bitmask(
     Ok(out_array.into())
 }
 
+#[cfg(feature = "cuda")]
+#[pyfunction]
+fn cuda_contact_frequency(
+    py: Python<'_>,
+    coords: PyReadonlyArray3<'_, f32>,
+    cutoff: Option<f32>,
+    device_id: Option<usize>,
+) -> PyResult<Py<PyArray2<f32>>> {
+    let cutoff = cutoff.unwrap_or(4.5);
+    let device_id = device_id.unwrap_or(0);
+    let view = coords.as_array();
+    let num_frames = view.shape()[0];
+    let num_res = view.shape()[1];
+
+    let slice = coords.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("Coordinate array must be contiguous: {:?}", e))
+    })?;
+
+    let engine = cuda::GpuTrajectoryEngine::new(device_id)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+
+    let freqs = py.allow_threads(|| {
+        engine.contact_frequency(slice, num_frames, num_res, cutoff)
+    }).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA contact freq error: {:?}", e)))?;
+
+    let out_array = PyArray2::<f32>::zeros_bound(py, [num_res, num_res], false);
+    {
+        let mut writer = out_array.readwrite();
+        let target_slice = writer.as_slice_mut().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Buffer write error: {:?}", e))
+        })?;
+        target_slice.copy_from_slice(&freqs);
+    }
+    Ok(out_array.into())
+}
+
 #[pymodule]
 fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Msa>()?;
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_dcd, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rg, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_raw, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_kabsch, m)?)?;
@@ -413,7 +473,9 @@ fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_function(wrap_pyfunction!(cuda_pairwise_rmsd, m)?)?;
         m.add_function(wrap_pyfunction!(cuda_cluster_daura, m)?)?;
         m.add_function(wrap_pyfunction!(cuda_contact_map_bitmask, m)?)?;
+        m.add_function(wrap_pyfunction!(cuda_contact_frequency, m)?)?;
     }
     Ok(())
 }
+
 

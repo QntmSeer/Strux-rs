@@ -14,9 +14,12 @@ pub struct Msa {
     #[pyo3(get)]
     pub descriptions: Vec<String>,
     pub deletion_matrix_flat: Vec<i32>,
+    #[pyo3(get)]
     pub num_seqs: usize,
+    #[pyo3(get)]
     pub num_res: usize,
 }
+
 
 #[pymethods]
 impl Msa {
@@ -72,6 +75,24 @@ impl Msa {
         }
         Ok(array)
     }
+
+    /// Converts all sequences directly into an [N_seq, N_res] uint8 ASCII token matrix
+    #[getter]
+    fn tokens_np<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<u8>>> {
+        let array = PyArray2::<u8>::zeros_bound(py, [self.num_seqs, self.num_res], false);
+        {
+            let mut writer = array.readwrite();
+            let slice = writer.as_slice_mut().unwrap();
+            for (i, seq) in self.sequences.iter().enumerate() {
+                let row_start = i * self.num_res;
+                let seq_bytes = seq.as_bytes();
+                let copy_len = std::cmp::min(seq_bytes.len(), self.num_res);
+                slice[row_start..row_start + copy_len].copy_from_slice(&seq_bytes[..copy_len]);
+            }
+        }
+        Ok(array)
+    }
+
 
     fn truncate(&self, max_seqs: usize) -> Self {
         let limit = std::cmp::min(max_seqs, self.num_seqs);

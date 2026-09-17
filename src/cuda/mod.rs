@@ -19,8 +19,10 @@ impl GpuTrajectoryEngine {
                 "pairwise_qcp_tiled_kernel",
                 "daura_count_neighbors_kernel",
                 "contact_map_bitmask_kernel",
+                "contact_frequency_kernel",
             ],
         )?;
+
         Ok(Self { dev })
     }
 
@@ -230,4 +232,48 @@ impl GpuTrajectoryEngine {
 
         Ok(host_bitmask)
     }
+
+    /// Computes dense pairwise contact frequency matrix [num_res, num_res] directly on GPU.
+    pub fn contact_frequency(
+        &self,
+        flat_coords: &[f32],
+        num_frames: usize,
+        num_res: usize,
+        cutoff: f32,
+    ) -> Result<Vec<f32>, DriverError> {
+        if num_frames == 0 || num_res == 0 {
+            return Ok(Vec::new());
+        }
+
+        let d_coords = self.dev.htod_sync_copy(flat_coords)?;
+        let mut d_freq = self.dev.alloc_zeros::<f32>(num_res * num_res)?;
+
+        let freq_fn = self.dev.get_func("qcp_module", "contact_frequency_kernel").unwrap();
+        let tile_dim = 16;
+        let grid_x = (num_res + tile_dim - 1) / tile_dim;
+        let grid_y = (num_res + tile_dim - 1) / tile_dim;
+
+        let cfg = LaunchConfig {
+            grid_dim: (grid_x as u32, grid_y as u32, 1),
+            block_dim: (tile_dim as u32, tile_dim as u32, 1),
+            shared_mem_bytes: 0,
+        };
+
+        unsafe {
+            freq_fn.launch(
+                cfg,
+                (
+                    &d_coords,
+                    &mut d_freq,
+                    cutoff * cutoff,
+                    num_frames as i32,
+                    num_res as i32,
+                ),
+            )?;
+        }
+
+        let host_freq = self.dev.dtoh_sync_copy(&d_freq)?;
+        Ok(host_freq)
+    }
 }
+
