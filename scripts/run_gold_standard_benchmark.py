@@ -156,12 +156,19 @@ results_2k39.append(("strux (16T)", rate_strux_16, t_strux_16, rate_strux_16/rat
 print(f"   10. strux-rs (16T Rayon):      {t_strux_16*1e3:.2f} ms | {rate_strux_16:,.1f} align/s | {rate_strux_16/rate_bio:.1f}x")
 
 # K. strux-rs CUDA GPU (RTX A2000)
-t0 = time.perf_counter()
+# Warm-up to initialize CUDA driver context and PTX module
 _ = strux_rs.cuda_pairwise_rmsd(coords_116)
-t_strux_gpu = time.perf_counter() - t0
+
+# Timed runs
+gpu_iters = 5
+t0 = time.perf_counter()
+for _ in range(gpu_iters):
+    _ = strux_rs.cuda_pairwise_rmsd(coords_116)
+t_strux_gpu = (time.perf_counter() - t0) / gpu_iters
 rate_strux_gpu = N_PAIRS / t_strux_gpu
 results_2k39.append(("strux (CUDA)", rate_strux_gpu, t_strux_gpu, rate_strux_gpu/rate_bio, "#0f766e"))
 print(f"   11. strux-rs (CUDA RTX A2000): {t_strux_gpu*1e3:.2f} ms | {rate_strux_gpu:,.1f} align/s | {rate_strux_gpu/rate_bio:,.0f}x")
+
 
 # Parity check on Ubiquitin Model 1 vs 2
 rmsd_bio = sup.get_rms()
