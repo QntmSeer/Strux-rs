@@ -6,7 +6,7 @@
 
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)]()
 [![Python Bindings](https://img.shields.io/badge/Python-PyO3_/_Maturin-blue.svg)]()
-[![PyPI Package](https://img.shields.io/badge/PyPI-v0.3.1-blue.svg)](https://pypi.org/project/strux-rs/)
+[![PyPI Package](https://img.shields.io/badge/PyPI-v0.4.0-blue.svg)](https://pypi.org/project/strux-rs/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.x_QCP-76b900.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
