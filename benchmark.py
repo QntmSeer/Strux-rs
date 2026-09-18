@@ -6,10 +6,14 @@ import numpy as np
 import strux_rs
 
 def create_trajectory():
+    trajectory_file = "trajectory.pdb"
+    if os.path.exists(trajectory_file):
+        return trajectory_file
+
     frames_dir = "../MD/data/cabs_traj_design9/frames"
     pdb_files = sorted(glob.glob(os.path.join(frames_dir, "frame_*.pdb")))
     if not pdb_files:
-        print("Error: No frame PDB files found.")
+        print("Error: trajectory.pdb not found and no frame PDB files available.")
         return None
     
     trajectory_file = "trajectory.pdb"

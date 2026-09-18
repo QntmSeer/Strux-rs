@@ -50,13 +50,8 @@ t_bio_total = N_PAIRS / rate_bio
 results_2k39.append(("Biopython", rate_bio, t_bio_total, 1.0, "#94a3b8"))
 print(f"    1. Biopython (SVD):           {t_bio_total:.2f} s | {rate_bio:,.1f} align/s | 1.0x (Ref)")
 
-# B. OpenFold / AlphaFold Reference
-t_of_total = t_bio_total * 0.99
-rate_of = N_PAIRS / t_of_total
-results_2k39.append(("OpenFold", rate_of, t_of_total, 1.0, "#94a3b8"))
-print(f"    2. OpenFold / AlphaFold:      {t_of_total:.2f} s | {rate_of:,.1f} align/s | 1.0x")
+# B. SciPy
 
-# C. SciPy
 t0 = time.perf_counter()
 for i in range(500):
     idx_a = i % N_MODELS
@@ -213,9 +208,9 @@ sto_path = "benchmarks/data/hmm_output.sto"
 with open(sto_path, "r") as f:
     sto_str = f.read()
 
-# OpenFold Python
+# Pure Python Stockholm Parser Baseline
 import collections
-def of_parse_stockholm(s):
+def py_parse_stockholm(s):
     name_to_seq = collections.OrderedDict()
     for l in s.splitlines():
         l = l.strip()
@@ -227,24 +222,24 @@ def of_parse_stockholm(s):
     return list(name_to_seq.values())
 
 t0 = time.perf_counter()
-seqs_of = of_parse_stockholm(sto_str)
-t_of_sto = time.perf_counter() - t0
+seqs_py = py_parse_stockholm(sto_str)
+t_py_sto = time.perf_counter() - t0
 
 t0 = time.perf_counter()
 msa_st = strux_rs.parse_stockholm_file(sto_path)
 t_st_sto = time.perf_counter() - t0
 
 mb_sto = len(sto_str.encode('utf-8')) / (1024 * 1024)
-print(f"    Human Kinase HMMER Stockholm ({mb_sto:.1f} MB, {len(seqs_of):,d} sequences):")
-print(f"      OpenFold / AlphaFold: {t_of_sto:.4f} s ({mb_sto/t_of_sto:.1f} MB/s)")
-print(f"      strux-rs:             {t_st_sto:.4f} s ({mb_sto/t_st_sto:.1f} MB/s, {t_of_sto/t_st_sto:.1f}x faster)")
+print(f"    Human Kinase HMMER Stockholm ({mb_sto:.1f} MB, {len(seqs_py):,d} sequences):")
+print(f"      Pure Python (Baseline): {t_py_sto:.4f} s ({mb_sto/t_py_sto:.1f} MB/s)")
+print(f"      strux-rs:               {t_st_sto:.4f} s ({mb_sto/t_st_sto:.1f} MB/s, {t_py_sto/t_st_sto:.1f}x faster)")
 
 # B. Real AlphaFold BFD/Uniclust A3M
 a3m_path = "benchmarks/data/bfd_uniclust_hits.a3m"
 with open(a3m_path, "r") as f:
     a3m_str = f.read()
 
-def of_parse_a3m(s):
+def py_parse_a3m(s):
     seqs, idx = [], -1
     for l in s.splitlines():
         l = l.strip()
@@ -258,8 +253,8 @@ def of_parse_a3m(s):
     return [x.translate(del_tab) for x in seqs]
 
 t0 = time.perf_counter()
-_ = of_parse_a3m(a3m_str)
-t_of_a3m = time.perf_counter() - t0
+_ = py_parse_a3m(a3m_str)
+t_py_a3m = time.perf_counter() - t0
 
 t0 = time.perf_counter()
 _ = strux_rs.parse_a3m(a3m_str)
@@ -267,8 +262,8 @@ t_st_a3m = time.perf_counter() - t0
 
 kb_a3m = len(a3m_str.encode('utf-8')) / 1024
 print(f"    AlphaFold BFD/Uniclust A3M ({kb_a3m:.1f} KB):")
-print(f"      OpenFold / AlphaFold: {t_of_a3m*1e3:.2f} ms")
-print(f"      strux-rs:             {t_st_a3m*1e3:.2f} ms ({t_of_a3m/t_st_a3m:.1f}x faster)")
+print(f"      Pure Python (Baseline): {t_py_a3m*1e3:.2f} ms")
+print(f"      strux-rs:               {t_st_a3m*1e3:.2f} ms ({t_py_a3m/t_st_a3m:.1f}x faster)")
 
 # Save benchmark data for plotting
 with open("benchmarks/gold_standard_superimpose.dat", "w") as f:

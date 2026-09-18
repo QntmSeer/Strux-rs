@@ -33,7 +33,6 @@ ax1 = fig.add_subplot(gs[0, :])
 
 packages_1 = [
     'Biopython\n(SVD)', 
-    'OpenFold/\nAlphaFold', 
     'SciPy\n(align)', 
     'MDAnalysis\n(QCPROT)', 
     'MDTraj\n(AVX QCP)', 
@@ -44,10 +43,10 @@ packages_1 = [
     'strux-rs\n(16T CPU)',
     'strux-rs\n(CUDA GPU)'
 ]
-rates_1 = [446.6, 451.1, 5436.6, 10567.4, 26046.1, 39710.8, 43241.4, 76612.5, 92281.5, 596176.5, 1941698.0]
-speedups_1 = ['1.0x', '1.0x', '12.2x', '23.7x', '58.3x', '88.9x', '96.8x', '172x', '207x', '1,335x', '4,348x']
+rates_1 = [446.6, 5436.6, 10567.4, 26046.1, 39710.8, 43241.4, 76612.5, 92281.5, 596176.5, 1941698.0]
+speedups_1 = ['1.0x', '12.2x', '23.7x', '58.3x', '88.9x', '96.8x', '172x', '207x', '1,335x', '4,348x']
 colors_1 = [
-    '#94a3b8', '#94a3b8', '#64748b', '#475569', '#334155', 
+    '#94a3b8', '#64748b', '#475569', '#334155', 
     '#334155', '#2563eb', '#1e293b', '#0f172a', '#1d4ed8', '#0f766e'
 ]
 
@@ -97,9 +96,9 @@ for bar, rate, sp in zip(bars2, rates_2, speedups_2):
 ax3 = fig.add_subplot(gs[1, 1])
 
 labels_3 = [
-    'Kinase STO\nAF/OpenFold',
+    'Kinase STO\nPure Python',
     'Kinase STO\nstrux-rs',
-    'BFD A3M\nAF/OpenFold',
+    'BFD A3M\nPure Python',
     'BFD A3M\nstrux-rs'
 ]
 throughput_3 = [199.5, 270.7, 41.9, 168.9]  # MB/s
