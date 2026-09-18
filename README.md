@@ -1,8 +1,13 @@
+<p align="center">
+  <img src="assets/strux_logo.png" alt="strux-rs demoscene insignia" width="360">
+</p>
+
 # strux-rs
 
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)]()
 [![Python Bindings](https://img.shields.io/badge/Python-PyO3_/_Maturin-blue.svg)]()
 [![PyPI Package](https://img.shields.io/badge/PyPI-v0.3.1-blue.svg)](https://pypi.org/project/strux-rs/)
+[![CUDA](https://img.shields.io/badge/CUDA-12.x_QCP-76b900.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
 `strux-rs` is a Rust library with Python bindings (PyO3 / NumPy) providing CPU- and GPU-accelerated algorithms for structural biology, molecular dynamics (MD) trajectory analysis, and multiple sequence alignment (MSA) preprocessing.
@@ -11,9 +16,10 @@
 
 ## Key Capabilities
 
-* **GPU Trajectory Alignment & Clustering (`cudarc`)**: All-to-all pairwise RMSD using the Theobald QCP algorithm, Daura conformational clustering, and packed 64-bit residue contact maps.
+* **Binary Trajectory Ingestion (`memmap2`)**: Pure-Rust memory-mapped CHARMM/NAMD `.dcd` parser yielding 3D coordinate tensors with zero C/Cython toolchain dependencies.
+* **GPU Trajectory Alignment & Clustering (`cudarc`)**: All-to-all pairwise RMSD using the Theobald QCP algorithm, Daura conformational clustering, and dense pairwise contact frequency matrices directly on VRAM.
 * **CPU Parallelism (`rayon`)**: Multi-threaded 1D and pairwise RMSD routines releasing the Python GIL with linear multi-core scaling.
-* **Zero-Copy MSA Parsing (`memmap2`)**: Memory-mapped A3M and Stockholm parsers producing contiguous NumPy arrays without intermediate allocations.
+* **Zero-Copy MSA Preprocessing**: Memory-mapped A3M and Stockholm parsers producing contiguous 2D `uint8` ASCII token matrices (`tokens_np`) and deletion matrices for ML pipelines in microseconds.
 * **Spatial Analysis**: Periodic Boundary Condition (PBC)-aware cell lists for neighbor search and interface contact detection.
 
 ---
@@ -86,6 +92,18 @@ Head-to-head comparison across standard computational biology packages executed 
 | Pure Python parser | 10.485s | 23,800 seqs/s | 1,349 MB |
 | `strux-rs` (`parse_a3m_file`) | **0.801s** | **312,000 seqs/s** | **966 MB** |
 
+### 6. Binary Trajectory & Dense Contact Acceleration
+
+Evaluated on GFP (`test_traj.dcd`, 1,919 atoms, 21 frames) and BFD/Kinase MSAs on an NVIDIA RTX A2000 Laptop GPU:
+
+| Task | Baseline Implementation | `strux-rs` | Speedup | Numerical Parity |
+| :--- | :--- | :--- | :---: | :---: |
+| **DCD Ingestion** | MDTraj (C plugin, cached top: 0.548 ms) | **0.379 ms** (`parse_dcd`) | **1.4×** | $0.000000 \text{ \AA}$ (exact vs MDAnalysis) |
+| **Contact Frequency** | CPU NumPy Vectorized (2,672 ms) | **161.7 ms** (`cuda_contact_frequency`) | **16.5×** | $0.000000$ (exact integer fraction) |
+| **MSA Token Matrix** | Python list comprehension (6.59 ms) | **9.5 µs** (`tokens_np`) | **691×** | Exact byte-for-byte match |
+
+![New Features Verification](benchmarks/new_features_verification.png)
+
 ---
 
 ## Installation
@@ -108,41 +126,54 @@ maturin develop --release --features cuda
 
 ## Python API Usage
 
-### GPU Trajectory Analysis
+### Trajectory Ingestion (.pdb and .dcd)
 ```python
 import strux_rs
 
-# Load trajectory coordinates [Frames, Atoms, 3] as float32
-traj = strux_rs.parse_pdb("trajectory.pdb")
+# Load ASCII PDB or zero-copy binary CHARMM/NAMD DCD trajectory
+traj_pdb = strux_rs.parse_pdb("trajectory.pdb")      # [Frames, Atoms, 3] float32
+traj_dcd = strux_rs.parse_dcd("trajectory.dcd")      # Pure-Rust mmap reader (0.38 ms)
+```
 
+### GPU Trajectory Analysis & Contact Maps
+```python
 if strux_rs.cuda_is_available():
     # 1. All-to-all pairwise RMSD matrix [Frames, Frames]
-    rmsd_matrix = strux_rs.cuda_pairwise_rmsd(traj)
+    rmsd_matrix = strux_rs.cuda_pairwise_rmsd(traj_dcd)
 
     # 2. Daura conformational clustering (cutoff in Angstroms)
-    labels, centroids = strux_rs.cuda_cluster_daura(traj, cutoff=2.0)
+    labels, centroids = strux_rs.cuda_cluster_daura(traj_dcd, cutoff=2.0)
 
-    # 3. Packed 64-bit residue contact map bitmask
-    bitmasks = strux_rs.cuda_contact_map_bitmask(traj, cutoff=4.5)
+    # 3. Dense pairwise contact frequency matrix directly on VRAM (16.5x faster)
+    contact_freq = strux_rs.cuda_contact_frequency(traj_dcd, cutoff=4.5)
+
+    # 4. Packed 64-bit residue contact map bitmask
+    bitmasks = strux_rs.cuda_contact_map_bitmask(traj_dcd, cutoff=4.5)
 ```
 
 ### Multi-Threaded CPU Trajectory RMSD (Rayon)
 ```python
 # Sequential 1D trajectory RMSD vs reference frame across all CPU cores
-rmsds = strux_rs.cpu_trajectory_rmsd(traj, traj[0])
+rmsds = strux_rs.cpu_trajectory_rmsd(traj_dcd, traj_dcd[0])
 
 # All-to-all pairwise RMSD matrix on CPU
-cpu_matrix = strux_rs.cpu_pairwise_rmsd(traj)
+cpu_matrix = strux_rs.cpu_pairwise_rmsd(traj_dcd)
 ```
 
 ### Zero-Copy MSA Preprocessing
 ```python
-# Memory-mapped A3M parsing directly to 2D NumPy deletion matrix
+# Parse A3M or Stockholm directly to NumPy
 msa = strux_rs.parse_a3m_file("uniref90_hits.a3m")
-deletion_matrix = msa.deletion_matrix_np
+
+# 1. Direct 2D uint8 ASCII token matrix for ML dataloaders (9.5 µs)
+tokens = msa.tokens_np
+
+# 2. Deletion matrix [N_seq, N_res]
+del_matrix = msa.deletion_matrix_np
 ```
 
 ---
 
 ## License
 MIT License.
+

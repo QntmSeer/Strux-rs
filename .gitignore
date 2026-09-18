@@ -26,4 +26,22 @@ id_*
 benchmarks/data/
 test_*.py
 *.dat
+*.dcd
+
+# Scratch scripts & temporary plot drafts
+scripts/fair_dcd_benchmark.sh
+scripts/generate_dcd.sh
+scripts/render_complete_ecosystem_plot.py
+scripts/render_new_features_plot.py
+scripts/render_retro_vibrant_plot.py
+scripts/render_standard_plots.py
+scripts/run_complete_ecosystem_benchmark.py
+scripts/run_retro_ecosystem_benchmark.py
+scripts/setup_gnuplot_remote.sh
+scripts/stress_test_new_features.sh
+scripts/verify_new_features.sh
+benchmarks/complete_ecosystem_comparison.png
+benchmarks/retro_vibrant*
+benchmarks/standard*
+
 
