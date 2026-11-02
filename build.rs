@@ -16,14 +16,7 @@ fn main() {
         let cu_path = PathBuf::from("src/cuda/kernels/qcp.cu");
         let precompiled_ptx = PathBuf::from("src/cuda/kernels/qcp.ptx");
 
-        // 1. If precompiled PTX exists, copy it directly to OUT_DIR
-        if precompiled_ptx.exists() {
-            fs::copy(&precompiled_ptx, &out_ptx).expect("Failed to copy precompiled PTX");
-            println!("cargo:warning=Using precompiled qcp.ptx");
-            return;
-        }
-
-        // 2. Otherwise try compiling via nvcc
+        // 1. Try compiling via nvcc first so edits to qcp.cu take effect; fallback to precompiled PTX
         let status = Command::new("nvcc")
             .arg("-ptx")
             .arg("-O3")
@@ -35,10 +28,15 @@ fn main() {
 
         match status {
             Ok(s) if s.success() => {
+                let _ = fs::copy(&out_ptx, &precompiled_ptx);
                 println!("cargo:warning=Successfully compiled qcp.cu to PTX via nvcc");
             }
+            _ if precompiled_ptx.exists() => {
+                fs::copy(&precompiled_ptx, &out_ptx).expect("Failed to copy precompiled PTX");
+                println!("cargo:warning=Using precompiled qcp.ptx");
+            }
             _ => {
-                panic!("Neither precompiled qcp.ptx nor nvcc compiler found!");
+                panic!("Neither nvcc compiler nor precompiled qcp.ptx found!");
             }
         }
     }

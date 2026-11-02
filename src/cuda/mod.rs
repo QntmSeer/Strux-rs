@@ -47,7 +47,7 @@ impl GpuTrajectoryEngine {
         // 3. Launch Pass 1: Center coordinates & precompute norms
         let center_fn = self.dev.get_func("qcp_module", "center_and_norms_kernel").unwrap();
         let threads_x = 128;
-        let blocks_x = (num_frames + threads_x - 1) / threads_x;
+        let blocks_x = num_frames.div_ceil(threads_x);
         let cfg_center = LaunchConfig {
             grid_dim: (blocks_x as u32, 1, 1),
             block_dim: (threads_x as u32, 1, 1),
@@ -66,8 +66,8 @@ impl GpuTrajectoryEngine {
         // 5. Launch Pass 2: Tiled QCP RMSD Kernel
         let qcp_fn = self.dev.get_func("qcp_module", "pairwise_qcp_tiled_kernel").unwrap();
         let tile_dim = 16;
-        let grid_x = (num_frames + tile_dim - 1) / tile_dim;
-        let grid_y = (num_frames + tile_dim - 1) / tile_dim;
+        let grid_x = num_frames.div_ceil(tile_dim);
+        let grid_y = num_frames.div_ceil(tile_dim);
         let cfg_qcp = LaunchConfig {
             grid_dim: (grid_x as u32, grid_y as u32, 1),
             block_dim: (tile_dim as u32, tile_dim as u32, 1),
@@ -114,7 +114,7 @@ impl GpuTrajectoryEngine {
 
         let count_fn = self.dev.get_func("qcp_module", "daura_count_neighbors_kernel").unwrap();
         let threads = 256;
-        let blocks = (num_frames + threads - 1) / threads;
+        let blocks = num_frames.div_ceil(threads);
         let cfg = LaunchConfig {
             grid_dim: (blocks as u32, 1, 1),
             block_dim: (threads as u32, 1, 1),
@@ -186,12 +186,12 @@ impl GpuTrajectoryEngine {
         num_res: usize,
         cutoff: f32,
     ) -> Result<Vec<u64>, DriverError> {
-        let num_u64_per_frame = (num_res * num_res + 63) / 64;
+        let num_u64_per_frame = (num_res * num_res).div_ceil(64);
         let mut host_bitmask = Vec::with_capacity(num_frames * num_u64_per_frame);
 
         let contact_fn = self.dev.get_func("qcp_module", "contact_map_bitmask_kernel").unwrap();
         let threads = 128;
-        let blocks_x = (num_u64_per_frame + threads - 1) / threads;
+        let blocks_x = num_u64_per_frame.div_ceil(threads);
         let cutoff_sq = cutoff * cutoff;
 
         // ponytail: stream contact bitmask computation in 500 MB chunks to bound VRAM usage on 4GB laptop GPUs
@@ -250,8 +250,8 @@ impl GpuTrajectoryEngine {
 
         let freq_fn = self.dev.get_func("qcp_module", "contact_frequency_kernel").unwrap();
         let tile_dim = 16;
-        let grid_x = (num_res + tile_dim - 1) / tile_dim;
-        let grid_y = (num_res + tile_dim - 1) / tile_dim;
+        let grid_x = num_res.div_ceil(tile_dim);
+        let grid_y = num_res.div_ceil(tile_dim);
 
         let cfg = LaunchConfig {
             grid_dim: (grid_x as u32, grid_y as u32, 1),

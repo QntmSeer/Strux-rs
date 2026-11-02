@@ -9,24 +9,28 @@ pub struct CellList {
 
 impl CellList {
     pub fn build(coords: &[[f32; 3]], cutoff: f32, box_dims: Option<[f32; 3]>) -> Self {
+        let safe_cutoff = if cutoff.is_finite() && cutoff > 1e-3 { cutoff } else { 1e-3 };
         let mut cells = HashMap::new();
         for (idx, &pos) in coords.iter().enumerate() {
-            let cell_coord = Self::get_cell_coord(pos, cutoff, box_dims);
+            let cell_coord = Self::get_cell_coord(pos, safe_cutoff, box_dims);
             cells.entry(cell_coord).or_insert_with(Vec::new).push(idx);
         }
         CellList {
             cells,
-            cutoff,
+            cutoff: safe_cutoff,
             box_dims,
         }
     }
 
     fn get_cell_coord(pos: [f32; 3], cutoff: f32, box_dims: Option<[f32; 3]>) -> (i32, i32, i32) {
+        if !pos[0].is_finite() || !pos[1].is_finite() || !pos[2].is_finite() {
+            return (0, 0, 0);
+        }
         let mut p = pos;
         if let Some(box_l) = box_dims {
             for i in 0..3 {
                 let l = box_l[i];
-                p[i] = p[i] % l;
+                p[i] %= l;
                 if p[i] < 0.0 {
                     p[i] += l;
                 }

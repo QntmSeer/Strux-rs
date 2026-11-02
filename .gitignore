@@ -43,5 +43,7 @@ scripts/verify_new_features.sh
 benchmarks/complete_ecosystem_comparison.png
 benchmarks/retro_vibrant*
 benchmarks/standard*
+benchmarks/openfold_vs_strux*
+
 
 

@@ -1,6 +1,6 @@
 // ponytail: fast A3M/Stockholm parsing with 100% multi-threaded Rayon record splitting & memmap2.
 use pyo3::prelude::*;
-use numpy::{PyArray2, PyArrayMethods};
+use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use rayon::prelude::*;
 use std::fs::File;
 use std::path::Path;
@@ -111,6 +111,119 @@ impl Msa {
     fn __len__(&self) -> usize {
         self.num_seqs
     }
+
+    /// Clusters sequences by pairwise sequence identity (e.g. min_identity = 0.70).
+    /// Used by AF-Cluster to generate diverse conformational sub-alignments.
+    /// Returns (labels, cluster_representatives).
+    #[pyo3(signature = (min_identity=0.7))]
+    fn cluster<'py>(
+        &self,
+        py: Python<'py>,
+        min_identity: f32,
+    ) -> PyResult<(Bound<'py, PyArray1<usize>>, Bound<'py, PyArray1<usize>>)> {
+        let (labels, reps) = cluster_sequences(&self.sequences, min_identity);
+        let py_labels = PyArray1::from_vec_bound(py, labels);
+        let py_reps = PyArray1::from_vec_bound(py, reps);
+        Ok((py_labels, py_reps))
+    }
+
+    /// Extracts an AF-Cluster sub-MSA containing only sequences assigned to cluster_id.
+    fn get_cluster(&self, cluster_id: usize, labels: Vec<usize>) -> PyResult<Self> {
+        let mut new_seqs = Vec::new();
+        let mut new_descs = Vec::new();
+        let mut new_del = Vec::new();
+
+        for (i, &lbl) in labels.iter().enumerate() {
+            if lbl == cluster_id && i < self.num_seqs {
+                new_seqs.push(self.sequences[i].clone());
+                new_descs.push(self.descriptions[i].clone());
+                let start = i * self.num_res;
+                let end = start + self.num_res;
+                new_del.extend_from_slice(&self.deletion_matrix_flat[start..end]);
+            }
+        }
+
+        let num_seqs = new_seqs.len();
+        Ok(Msa {
+            sequences: new_seqs,
+            descriptions: new_descs,
+            deletion_matrix_flat: new_del,
+            num_seqs,
+            num_res: self.num_res,
+        })
+    }
+}
+
+/// Clusters MSA sequences by pairwise identity using greedy representative clustering.
+/// Returns (cluster_labels: Vec<usize>, cluster_representatives: Vec<usize>).
+pub fn cluster_sequences(
+    sequences: &[String],
+    min_identity: f32,
+) -> (Vec<usize>, Vec<usize>) {
+    let num_seqs = sequences.len();
+    if num_seqs == 0 {
+        return (Vec::new(), Vec::new());
+    }
+
+    let seq_bytes: Vec<&[u8]> = sequences.iter().map(|s| s.as_bytes()).collect();
+    let mut labels = vec![usize::MAX; num_seqs];
+    let mut representatives = Vec::new();
+
+    for i in 0..num_seqs {
+        let seq_i = seq_bytes[i];
+        let len_i = seq_i.len();
+        if len_i == 0 {
+            continue;
+        }
+
+        let mut matched_cluster = None;
+        for (cluster_id, &rep_idx) in representatives.iter().enumerate() {
+            let rep_seq: &[u8] = seq_bytes[rep_idx];
+            let compare_len = std::cmp::min(len_i, rep_seq.len());
+            if compare_len == 0 {
+                continue;
+            }
+
+            let mut matches = 0usize;
+            let mut valid_positions = 0usize;
+
+            for p in 0..compare_len {
+                let a = seq_i[p];
+                let b = rep_seq[p];
+                if a == b'-' && b == b'-' {
+                    continue;
+                }
+                valid_positions += 1;
+                if a == b && a != b'-' {
+                    matches += 1;
+                }
+            }
+
+            let identity = if valid_positions > 0 {
+                matches as f32 / valid_positions as f32
+            } else {
+                0.0
+            };
+
+            if identity >= min_identity {
+                matched_cluster = Some(cluster_id);
+                break;
+            }
+        }
+
+        match matched_cluster {
+            Some(cid) => {
+                labels[i] = cid;
+            }
+            None => {
+                let new_cid = representatives.len();
+                representatives.push(i);
+                labels[i] = new_cid;
+            }
+        }
+    }
+
+    (labels, representatives)
 }
 
 #[inline]

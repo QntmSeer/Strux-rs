@@ -1,42 +1,42 @@
-﻿# Gnuplot script: Multi-Dimensional Performance Scaling Benchmark
+# Gnuplot script: Multi-Dimensional Performance Scaling Benchmark (SpinGlassBench Theme A)
 # Usage: gnuplot benchmarks/plot_comprehensive_comparison.gp
 
-set terminal pngcairo size 1800,550 enhanced font 'Arial,11'
+load "benchmarks/style.gp"
+set terminal pngcairo size 1650,480 enhanced font "Latin Modern Mono,9" background rgb PAPER
 set output 'benchmarks/openfold_vs_strux_scaling_gnuplot.png'
 
-set multiplot layout 1,3 title 'OpenFold vs strux-rs Multi-Dimensional Performance Scaling Benchmark' font 'Arial-Bold,15'
+set multiplot layout 1,3
 
 # Panel 1: Depth Scaling
-set title 'A. A3M Parsing Time vs Depth (L=150)' font 'Arial-Bold,12'
-set xlabel 'Alignment Depth (Sequences)' font 'Arial-Bold,10'
-set ylabel 'Parse Time (seconds)' font 'Arial-Bold,10'
-set grid
+set title "A3M parse time stays sub-50ms up to 10k depth\n{/*0.8 L = 150 residues; zero-copy FFI vs pure Python}" offset 0,0.3
+set xlabel 'alignment depth (sequences)'
+set ylabel 'parse time (seconds)'
 set key top left
 
-plot 'benchmarks/a3m_depth_scaling.dat' using 1:3 with linespoints lw 2 pt 7 lc rgb '#7f8c8d' title 'OpenFold (Pure Python)', \
-     'benchmarks/a3m_depth_scaling.dat' using 1:4 with linespoints lw 2 pt 5 lc rgb '#27ae60' title 'strux-rs (Zero-Copy FFI)'
+plot 'benchmarks/a3m_depth_scaling.dat' using 1:3 with linespoints ls 5 title 'OpenFold (Python)', \
+     'benchmarks/a3m_depth_scaling.dat' using 1:4 with linespoints ls 1 title 'strux-rs (Zero-Copy FFI)'
 
 # Panel 2: Length Scaling (MB/s)
-set title 'B. Ingestion Throughput vs Length (N=10k)' font 'Arial-Bold,12'
-set xlabel 'Sequence Length (Residues)' font 'Arial-Bold,10'
-set ylabel 'Data Throughput (MB / s)' font 'Arial-Bold,10'
+set title "Zero-copy FFI sustains >150 MB/s across lengths\n{/*0.8 N = 10,000 sequences; L = 50 to 1,000 residues}" offset 0,0.3
+set xlabel 'sequence length (residues)'
+set ylabel 'ingestion rate (MB / s)'
 set yrange [0:350]
-set key top left
+set key top right
 
-plot 'benchmarks/a3m_length_scaling.dat' using 1:5 with linespoints lw 2 pt 7 lc rgb '#7f8c8d' title 'OpenFold (Pure Python)', \
-     'benchmarks/a3m_length_scaling.dat' using 1:6 with linespoints lw 2 pt 9 lc rgb '#2980b9' title 'strux-rs (Zero-Copy FFI)'
+plot 'benchmarks/a3m_length_scaling.dat' using 1:5 with linespoints ls 5 title 'OpenFold (Python)', \
+     'benchmarks/a3m_length_scaling.dat' using 1:6 with linespoints ls 2 title 'strux-rs (Zero-Copy FFI)'
 
 # Panel 3: Superimposition vs Protein Size (log scale)
-set title 'C. Kabsch Superimposition vs Protein Size' font 'Arial-Bold,12'
-set xlabel 'Target Protein Size (Atoms)' font 'Arial-Bold,10'
-set ylabel 'Throughput (Alignments / sec, log scale)' font 'Arial-Bold,10'
+set title "1T Rust Kabsch is 97x faster than Bio.SVD\n{/*0.8 N = 100 to 10,000 atoms; single-thread CPU parity}" offset 0,0.3
+set xlabel 'target protein size (atoms)'
+set ylabel 'alignments / second (log scale)'
 set logscale y 10
-set format y '10^{%T}'
+set format y '1e%T'
 set yrange [50:500000]
 set key top right
 
-plot 'benchmarks/superimpose_atom_scaling.dat' using 1:4 with linespoints lw 2 pt 7 lc rgb '#7f8c8d' title 'OpenFold (Bio.SVDSuperimposer)', \
-     'benchmarks/superimpose_atom_scaling.dat' using 1:5 with linespoints lw 2 pt 11 lc rgb '#8e44ad' title 'strux-rs (Single-Thread SVD)'
+plot 'benchmarks/superimpose_atom_scaling.dat' using 1:4 with linespoints ls 5 title 'OpenFold (Bio.SVD)', \
+     'benchmarks/superimpose_atom_scaling.dat' using 1:5 with linespoints ls 3 title 'strux-rs (1T Kabsch)'
 
 unset multiplot
 set output
