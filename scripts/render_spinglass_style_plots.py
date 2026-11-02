@@ -281,8 +281,8 @@ def make_hardware_soak():
 # 3. benchmarks/gold_standard_comparison.png
 # ==============================================================================
 def make_gold_standard():
-    fig = plt.figure(figsize=(7.4, 5.2))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.35, 1.0], hspace=0.48, wspace=0.32)
+    fig = plt.figure(figsize=(9.8, 6.0))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.35, 1.0], hspace=0.52, wspace=0.36)
 
     # Panel A (top full width): Horizontal Cleveland dot-and-stem plot (like SpinGlassBench Fig 7/9)
     ax1 = fig.add_subplot(gs[0, :])
@@ -380,7 +380,7 @@ def make_gold_standard():
 # 4. benchmarks/new_features_verification.png (Includes AMS Biophysics Suite!)
 # ==============================================================================
 def make_new_features():
-    fig, axes = plt.subplots(2, 2, figsize=(7.4, 5.2))
+    fig, axes = plt.subplots(2, 2, figsize=(10.8, 6.4))
     (ax1, ax2), (ax3, ax4) = axes
 
     # Panel A: AMS Biophysics Speedups (lDDT, MSA cluster, PCA, XTC)
@@ -409,16 +409,16 @@ def make_new_features():
     ax1.set_xlabel("speedup over NumPy / MDAnalysis (log scale)")
     titles(
         ax1,
-        "AMS biophysics kernels run 5.1x to 201x faster",
-        "16T Core i9 (309s burn: 5,658 lDDT / 815B pairs; err = 0)",
+        "AMS biophysics: 5.1x to 201x faster",
+        "16T Core i9 (5,658 lDDT / 815B pairs; err = 0)",
     )
 
     # Panel B: T4 Lysozyme 4-State Markov Population & Rare State Recovery
     states = [
-        "Buried/\nOpen",
-        "Exposed/\nOpen",
-        "Buried/\nClosed",
-        "Exposed/\nClosed (rare)",
+        "Buried\nOpen",
+        "Exposed\nOpen",
+        "Buried\nClosed",
+        "Exposed\nClosed (rare)",
     ]
     pi_true = np.array([58.2, 39.2, 1.9, 0.7])
     pi_rec = np.array([57.97, 39.34, 1.97, 0.73])
@@ -438,8 +438,8 @@ def make_new_features():
     ax2.legend(loc="upper right", fontsize=6.5)
     titles(
         ax2,
-        "Markov solver recovers the 0.7% rare state in 19.3 ms",
-        "2e6 steps (103.9M frames/s); max |pi - eig| = 1.36e-8; T = 300 K",
+        "Markov solver: 0.7% rare state in 19.3 ms",
+        "2M steps (103.9M fps); max |pi - eig| = 1.36e-8; T = 300 K",
     )
 
     # Panel C: Binary Trajectory Readers (.dcd and .xtc)
@@ -465,16 +465,16 @@ def make_new_features():
     ax3.set_ylabel("read latency (ms, log)")
     titles(
         ax3,
-        "Pure-Rust XTC and DCD readers beat C xdrfile plugins",
-        "XTC: 500x1,000 atoms (max err 1.5e-5 A); DCD: 21x1,919 atoms",
+        "Rust XTC & DCD beat C plugins (7.3x - 73.6x)",
+        "500-fr XTC (max err 1.5e-5 A); 21-fr DCD (exact match)",
     )
 
     # Panel D: Zero-copy tokens_np & GPU Contact Map
     accel = [
-        ("tokens_np\nPython", 1.0, GRAYS[1], "1.0x\n(8.40 ms)"),
-        ("tokens_np\nstrux-rs", 664.0, COBALT, "664x\n(12.6 us)"),
-        ("Contacts\nNumPy", 1.0, GRAYS[1], "1.0x\n(3.68 s)"),
-        ("Contacts\nCUDA", 19.5, RUST, "19.5x\n(189 ms)"),
+        ("tokens_np\n(Python)", 1.0, GRAYS[1], "1.0x\n(8.40 ms)"),
+        ("tokens_np\n(strux-rs)", 664.0, COBALT, "664x\n(12.6 us)"),
+        ("Contacts\n(NumPy)", 1.0, GRAYS[1], "1.0x\n(3.68 s)"),
+        ("Contacts\n(CUDA)", 19.5, RUST, "19.5x\n(189 ms)"),
     ]
     xs4 = np.arange(len(accel))
     for x, (name, sp, col, lbl) in zip(xs4, accel):
@@ -490,11 +490,11 @@ def make_new_features():
     ax4.set_ylabel("relative speedup (log)")
     titles(
         ax4,
-        "Zero-copy token blit (664x) & GPU contact map (19.5x)",
-        "1,024x73 MSA uint8 tensor and 1,919x1,919 contact matrix",
+        "Zero-copy tokens (664x) & GPU contact map (19.5x)",
+        "1,024x73 MSA tensor & 1,919x1,919 contact matrix",
     )
 
-    fig.tight_layout(h_pad=1.8, w_pad=1.8)
+    fig.tight_layout(h_pad=2.8, w_pad=3.2)
     Path("benchmarks").mkdir(exist_ok=True)
     fig.savefig("benchmarks/new_features_verification.png", bbox_inches="tight", dpi=220)
     plt.close(fig)
