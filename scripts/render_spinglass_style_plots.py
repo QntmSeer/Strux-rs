@@ -317,8 +317,8 @@ def make_gold_standard():
     ax1.set_xlabel("alignments / second (log scale)")
     titles(
         ax1,
-        "CUDA QCP and 16T Rayon outpace standard alignment packages by 10x to 4,348x",
-        "Ubiquitin solution NMR ensemble (PDB 2K39, 116 models, 13,456 pairs); identical workstation",
+        "Pairwise RMSD: CUDA is 21x faster than ProDy (4,348x vs Biopython)",
+        "PDB 2K39 (116 models, 13,456 pairs) on Core i9-11950H + RTX A2000; Biopython/SciPy scaled from 500 pairs",
     )
 
     # Panel B (bottom left): GFP Rg throughput
