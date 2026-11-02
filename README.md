@@ -20,9 +20,9 @@ pip install strux-rs
 
 ## Highlights
 
-* **High-Throughput Ingestion & In-Flight Filtering**: Memory-mapped `.xtc`, `.dcd`, `.cif` (AF3/Boltz/RCSB), and `.pdb` readers with zero-copy $C_\alpha$ and solute subsetting during decompression (**73.6×** faster than MDAnalysis, **1.4×** faster than MDTraj).
-* **De Novo Protein & Therapeutic Design Biophysics**: Target-anchored Pose RMSD & monomer scRMSD (**1,000 complexes in 0.76 ms**), all-atom interface physics (BUNS, H-bonds, salt bridges), 96-point Shrake-Rupley BSA (**1.25 ms**), screened Debye-Hückel $\Delta\Delta G_{\text{pH}}$, ANM normal modes, and developability screening (100k sequences in 270 ms).
-* **AI-Accelerated Simulation (AMS)**: Superposition-free AlphaFold lDDT (**201×** faster than NumPy), AF-Cluster sub-alignment generation (**33.8×** faster), Cartesian PCA (**5.1×** faster), and Markov State Model stationary populations at **103.9M frames/s**.
+* **High-Throughput Ingestion & In-Flight Filtering**: Memory-mapped `.xtc`, `.dcd`, `.cif` (AF3/Boltz/RCSB), and `.pdb` readers with zero-copy atom-index and $C_\alpha$ subsetting during decompression (**73.6×** faster than MDAnalysis, **1.4×** faster than MDTraj).
+* **De Novo Protein & Therapeutic Design Biophysics**: Target-anchored Pose RMSD & monomer scRMSD (**10,000 complexes in 4.03 ms**, **326×** vs NumPy SVD), interface geometry (buried polars heuristic, polar contacts, salt bridges), 96-point Shrake-Rupley BSA (**1.96 ms** for 2,048 atoms), screened Debye-Hückel $\Delta\Delta G_{\text{pH}}$, ANM normal modes, and developability screening (100k sequences in 270 ms).
+* **AI-Accelerated Simulation (AMS)**: AlphaFold lDDT (**201×** faster than NumPy), greedy sequence identity clustering (AF-Cluster style) (**33.8×** faster), Cartesian PCA (**5.1×** faster), and Markov state transition populations at **103.9M frames/s**.
 * **CUDA GPU Acceleration**: Pairwise RMSD at **2.05M alignments/s** (**4,348×** over Biopython, **25.3×** over Google JAX), Daura conformational clustering, and dense contact frequency matrices (**19.5×** speedup).
 
 ---
@@ -32,20 +32,20 @@ pip install strux-rs
 ```python
 import strux_rs
 
-# 1. Structure & Trajectory I/O with in-flight CA/solute filtering
+# 1. Structure & Trajectory I/O with in-flight CA/atom filtering
 coords, plddt = strux_rs.parse_cif_with_plddt("af3_model.cif", ca_only=True)
-traj = strux_rs.parse_xtc("md_production.xtc", ca_only=True)
+traj = strux_rs.parse_xtc("md_production.xtc", atom_indices=ca_indices)
 
 # 2. De novo therapeutic binder triage
 sc_rmsd, pose_rmsd = strux_rs.batch_pose_and_sc_rmsd(
     ref_target_ca, ref_binder_ca, mob_targets_ca, mob_binders_ca
 )
-contacts, hbonds, salt_bridges, buns = strux_rs.analyze_interface_physics(
+contacts, polar_contacts, salt_bridges, buns, buns_idx = strux_rs.analyze_interface_physics(
     coords[0], atom_names, res_names, chain_ids, res_ids, target_chain="A", binder_chain="B"
 )
 bsa_total, sasa_tgt, sasa_bnd, sasa_cpx = strux_rs.calculate_bsa(target_coords, binder_coords)
 
-# 3. Superposition-free lDDT & GPU pairwise alignment
+# 3. AlphaFold lDDT & GPU pairwise alignment
 global_lddt, per_res_lddt = strux_rs.calculate_lddt(coords_a, coords_b)
 if strux_rs.cuda_is_available():
     rmsd_matrix = strux_rs.cuda_pairwise_rmsd(traj)
@@ -84,11 +84,11 @@ Head-to-head comparison across standard computational biology packages on identi
 | Kernel / Task | Workload | Reference Baseline | `strux-rs` | Speedup | Numerical Parity |
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **AlphaFold lDDT** (`calculate_lddt`) | 4,000 atoms (16M pairs) | 943.42 ms (NumPy) | **4.69 ms** | **201.2×** | `0.00e+00` Δ (SO(3) invariant) |
-| **AF-Cluster MSA** (`cluster_msa`) | 10,000 seqs × 250 AA | 750.4 ms (Python) | **22.21 ms** | **33.8×** | Exact bit-for-bit cluster IDs |
+| **Greedy MSA Cluster** (`cluster_msa`) | 10,000 seqs × 250 AA | 750.4 ms (Python) | **22.21 ms** | **33.8×** | Exact bit-for-bit cluster IDs |
 | **GROMACS `.xtc` Read** (`parse_xtc`) | 500 frames × 1,000 atoms | 39.04 ms (MDAnalysis) | **5.32 ms** | **7.3×** (2.8× vs MDTraj) | `1.53e-5 Å` max Δ vs C `xdrfile` |
 | **CHARMM `.dcd` Read** (`parse_dcd`) | 21 frames × 1,919 atoms | 27.97 ms (MDAnalysis) | **0.380 ms** | **73.6×** (1.4× vs MDTraj) | `0.00e+00 Å` exact match |
 | **Trajectory PCA** (`trajectory_pca`) | 2,500 frames × 500 atoms | 978.12 ms (LAPACK SVD) | **190.20 ms** | **5.1×** | `0.00e+00` variance Δ, $\|\cos\theta\| \ge 0.9999999$ |
-| **Markov State $\Delta G$** (`markov_populations`) | 2,000,000 state steps | — | **19.25 ms** | **103.9M frames/s** | `1.36e-8` Δ vs `np.linalg.eig` (0.7% rare state) |
+| **Markov State Transitions** (`markov_populations`) | 2,000,000 state steps | — | **19.25 ms** | **103.9M frames/s** | `1.36e-8` Δ vs `np.linalg.eig` (0.7% rare state) |
 | **MSA `uint8` Tensor** (`tokens_np`) | 1,024 seqs × 73 residues | 8.40 ms (Python) | **12.6 µs** | **664×** | Exact byte-for-byte match |
 | **GPU Contact Map** (`cuda_contact_frequency`) | 1,919 × 1,919 grid | 3,677.7 ms (NumPy) | **188.8 ms** | **19.5×** | `0.00e+00` exact parity |
 
