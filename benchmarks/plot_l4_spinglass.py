@@ -118,7 +118,7 @@ def main():
     # Clean inline annotations matching benchmark_scaling.png
     end_label(ax1, pairs_l4[-1], rate_l4[-1], "CUDA L4 (60.5M/s)", dx=6, dy=1)
     end_label(ax1, pairs_a2000[-1], rate_a2000[-1], "A2000 (14.3M/s)", dx=6, dy=-12)
-    ax1.text(1.2e6, 3.2, "16T CPU (1.47M/s)", fontsize=6.5, color=INK2)
+    ax1.text(3.5e6, 3.2, "8T Cloud CPU (1.47M/s)", fontsize=6.5, color=INK2)
 
     # OOM marker
     ax1.scatter([2.25e8, 4.0e8], [14.34, 14.34], marker="x", color=INK2, s=40, zorder=5, lw=1.2)
@@ -178,11 +178,14 @@ def main():
 
     fig.tight_layout(w_pad=3.8)
 
-    out_benchmarks = Path(r"c:\Users\Gebruiker\Documents\Computational Bio\strux-rs\benchmarks\hardware_l4_scaling_comparison.png")
-    out_artifact = Path(r"C:\Users\Gebruiker\.gemini\antigravity\brain\533f8aaa-3288-419b-a6a1-a41762761b7f\hardware_l4_scaling_comparison.png")
+    out_benchmarks = "benchmarks/hardware_l4_scaling_comparison.png"
+    out_artifact = r"C:\Users\Gebruiker\.gemini\antigravity\brain\533f8aaa-3288-419b-a6a1-a41762761b7f\hardware_l4_scaling_comparison.png"
 
     fig.savefig(out_benchmarks, bbox_inches="tight", dpi=220)
-    fig.savefig(out_artifact, bbox_inches="tight", dpi=220)
+    try:
+        fig.savefig(out_artifact, bbox_inches="tight", dpi=220)
+    except Exception:
+        pass
     plt.close(fig)
     print("Regenerated hardware_l4_scaling_comparison.png matching benchmark_scaling.png exactly.")
 
