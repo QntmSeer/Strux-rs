@@ -185,7 +185,7 @@ pub fn calculate_lddt(
     let cutoff_sq = cutoff * cutoff;
     let thresholds = [0.5f32, 1.0, 2.0, 4.0];
 
-    let results: Vec<(f32, bool)> = (0..n)
+    let results: Vec<(f32, usize, usize)> = (0..n)
         .into_par_iter()
         .map(|i| {
             let mut preserved_count = 0usize;
@@ -219,28 +219,28 @@ pub fn calculate_lddt(
                 }
             }
 
-            if total_pairs > 0 {
-                (preserved_count as f32 / total_pairs as f32, true)
+            let score = if total_pairs > 0 {
+                preserved_count as f32 / total_pairs as f32
             } else {
-                (1.0, false)
-            }
+                1.0
+            };
+            (score, preserved_count, total_pairs)
         })
         .collect();
 
+    // Global lDDT pools every scored distance pair (AlphaFold `lddt(per_residue=False)` and
+    // OpenStructure definition), rather than averaging per-residue scores.
     let mut per_residue = Vec::with_capacity(n);
-    let mut total_score = 0.0f64;
-    let mut evaluated_residues = 0usize;
-
-    for (score, evaluated) in results {
+    let mut preserved_all = 0u64;
+    let mut pairs_all = 0u64;
+    for (score, preserved, pairs) in results {
         per_residue.push(score);
-        if evaluated {
-            total_score += score as f64;
-            evaluated_residues += 1;
-        }
+        preserved_all += preserved as u64;
+        pairs_all += pairs as u64;
     }
 
-    let global_lddt = if evaluated_residues > 0 {
-        (total_score / evaluated_residues as f64) as f32
+    let global_lddt = if pairs_all > 0 {
+        (preserved_all as f64 / pairs_all as f64) as f32
     } else {
         1.0
     };
