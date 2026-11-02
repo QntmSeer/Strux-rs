@@ -34,17 +34,14 @@ def numpy_reference_lddt(coords_ref: np.ndarray, coords_target: np.ndarray, cuto
     ) * 0.25
 
     per_res = np.ones(n, dtype=np.float32)
-    total_score = 0.0
-    evaluated_residues = 0
     for i in range(n):
         m = mask[i]
         cnt = np.sum(m)
         if cnt > 0:
-            score_i = float(np.sum(preserved[i, m]) / cnt)
-            per_res[i] = score_i
-            total_score += score_i
-            evaluated_residues += 1
-    global_lddt = float(total_score / evaluated_residues) if evaluated_residues > 0 else 1.0
+            per_res[i] = float(np.sum(preserved[i, m]) / cnt)
+    # Global score pools all scored pairs (AlphaFold lddt(per_residue=False) / OpenStructure).
+    n_pairs = int(np.sum(mask))
+    global_lddt = float(np.sum(preserved[mask]) / n_pairs) if n_pairs > 0 else 1.0
     return global_lddt, per_res
 
 def stress_test_lddt():
