@@ -777,7 +777,7 @@ fn analyze_interface_physics<'py>(
         biophysics::analyze_interface_physics(&c, &atom_names, &res_names, &chain_ids, &res_ids, &tc, &bc)
     });
     let buns_arr = PyArray1::from_vec_bound(py, res.buns_indices);
-    Ok((res.interface_contacts, res.h_bonds, res.salt_bridges, res.buns_count, buns_arr))
+    Ok((res.interface_contacts, res.polar_contacts, res.salt_bridges, res.buns_count, buns_arr))
 }
 
 #[pyfunction]
@@ -805,17 +805,29 @@ fn calculate_sasa<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (target_coords, binder_coords, probe_radius=1.4, n_points=96))]
+#[pyo3(signature = (target_coords, binder_coords, probe_radius=1.4, n_points=96, target_radii=None, binder_radii=None))]
 fn calculate_bsa(
     py: Python<'_>,
     target_coords: PyReadonlyArray2<'_, f32>,
     binder_coords: PyReadonlyArray2<'_, f32>,
     probe_radius: f32,
     n_points: usize,
+    target_radii: Option<PyReadonlyArray1<'_, f32>>,
+    binder_radii: Option<PyReadonlyArray1<'_, f32>>,
 ) -> PyResult<(f32, f32, f32, f32)> {
     let tc = readonly2_to_vec3(&target_coords)?;
     let bc = readonly2_to_vec3(&binder_coords)?;
-    Ok(py.allow_threads(|| biophysics::calculate_bsa(&tc, &bc, probe_radius, n_points)))
+    let tr: Option<Vec<f32>> = target_radii.map(|r| r.as_array().to_vec());
+    let br: Option<Vec<f32>> = binder_radii.map(|r| r.as_array().to_vec());
+    if tr.as_ref().map_or(false, |r| r.len() != tc.len()) {
+        return Err(pyo3::exceptions::PyValueError::new_err("target_radii length must match target_coords"));
+    }
+    if br.as_ref().map_or(false, |r| r.len() != bc.len()) {
+        return Err(pyo3::exceptions::PyValueError::new_err("binder_radii length must match binder_coords"));
+    }
+    Ok(py.allow_threads(|| {
+        biophysics::calculate_bsa(&tc, &bc, tr.as_deref(), br.as_deref(), probe_radius, n_points)
+    }))
 }
 
 #[pyfunction]
@@ -917,6 +929,7 @@ fn sliding_kmer_novelty<'py>(
 
 #[pymodule]
 fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_class::<Msa>()?;
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cif, m)?)?;
