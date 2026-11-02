@@ -6,7 +6,7 @@
 
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)]()
 [![Python Bindings](https://img.shields.io/badge/Python-PyO3_/_Maturin-blue.svg)]()
-[![PyPI Package](https://img.shields.io/badge/PyPI-v0.4.1-blue.svg)](https://pypi.org/project/strux-rs/)
+[![PyPI Package](https://img.shields.io/badge/PyPI-v0.4.2-blue.svg)](https://pypi.org/project/strux-rs/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.x_QCP-76b900.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
@@ -15,6 +15,8 @@ Fast, zero-C-dependency Rust + CUDA engine with Python bindings (`PyO3` / `NumPy
 ```bash
 pip install strux-rs
 ```
+
+Prebuilt wheels (Python 3.8+) are CPU-only. The CUDA functions (`cuda_pairwise_rmsd`, `cuda_cluster_daura`, `cuda_contact_frequency`) need a source build with `--features cuda`; see [Build from Source](#build-from-source).
 
 ---
 
