@@ -1,0 +1,22 @@
+{
+ "system": {
+  "file": "trajectory.pdb",
+  "frames": 21,
+  "heavy_atoms": 969
+ },
+ "xtc_max_abs_diff_A": 1.52587890625e-05,
+ "xtc_subset_max_abs_diff_A": 1.52587890625e-05,
+ "dcd_max_abs_diff_A": 7.62939453125e-06,
+ "dcd_subset_max_abs_diff_A": 7.62939453125e-06,
+ "kabsch_rmsd_max_abs_diff_A": 9.03489014092429e-06,
+ "rg_max_abs_diff_A": 2.4729057692240985e-05,
+ "pose_rmsd_max_abs_diff_A": 3.1576172531799784e-05,
+ "binder_rmsd_max_abs_diff_A": 8.811992131541047e-07,
+ "sasa_rel_diff_vs_freesasa": 0.0013510293790505582,
+ "bsa_element_radii_rel_diff_vs_freesasa": 0.0010346073153662992,
+ "bsa_default_radius_rel_diff_vs_freesasa": 0.02745216964388688,
+ "lddt_global_max_abs_diff": 2.7027207361030037e-08,
+ "lddt_per_residue_max_abs_diff": 2.9404958135081927e-08,
+ "strux_rs_version": "0.5.0",
+ "python": "3.13.18"
+}

@@ -410,15 +410,15 @@ def make_new_features():
     titles(
         ax1,
         "AMS biophysics: 5.1x to 201x faster",
-        "16T Core i9 (5,658 lDDT / 815B pairs; err = 0)",
+        "16T Core i9; baselines: NumPy (lDDT, PCA), Python (MSA), MDAnalysis (XTC)",
     )
 
-    # Panel B: T4 Lysozyme 4-State Markov Population & Rare State Recovery
+    # Panel B: synthetic 4-state Markov chain with known populations (tests/stress_test_ams.py)
     states = [
-        "Buried\nOpen",
-        "Exposed\nOpen",
-        "Buried\nClosed",
-        "Exposed\nClosed (rare)",
+        "State 1",
+        "State 2",
+        "State 3",
+        "State 4\n(rare)",
     ]
     pi_true = np.array([58.2, 39.2, 1.9, 0.7])
     pi_rec = np.array([57.97, 39.34, 1.97, 0.73])
@@ -438,8 +438,8 @@ def make_new_features():
     ax2.legend(loc="upper right", fontsize=6.5)
     titles(
         ax2,
-        "Markov solver: 0.7% rare state in 19.3 ms",
-        "2M steps (103.9M fps); max |pi - eig| = 1.36e-8; T = 300 K",
+        "MSM populations: 0.7% rare state recovered in 19.3 ms",
+        "synthetic 4-state chain, 2M steps; max |pi - eig| = 1.36e-8; T = 300 K",
     )
 
     # Panel C: Binary Trajectory Readers (.dcd and .xtc)
@@ -465,8 +465,8 @@ def make_new_features():
     ax3.set_ylabel("read latency (ms, log)")
     titles(
         ax3,
-        "Rust XTC & DCD beat C plugins (7.3x - 73.6x)",
-        "500-fr XTC (max err 1.5e-5 A); 21-fr DCD (exact match)",
+        "XTC read 7.3x vs MDAnalysis, 2.8x vs MDTraj",
+        "500-fr XTC (strux-rs 16T; max err 1.5e-5 A); 21-fr DCD (exact match)",
     )
 
     # Panel D: Zero-copy tokens_np & GPU Contact Map

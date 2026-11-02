@@ -36,6 +36,8 @@ class Msa:
         """Extract a sub-alignment (`Msa`) for a specific `cluster_id` (always retaining the query at index 0)."""
         ...
 
+__version__: str
+
 def parse_pdb(
     path: str,
     ca_only: bool = False,
@@ -141,7 +143,10 @@ def calculate_lddt(
     coords_target: NDArray[np.float32],
     cutoff: float = 15.0,
 ) -> Tuple[float, NDArray[np.float32]]:
-    """Superposition-free AlphaFold Local Distance Difference Test (lDDT) with thresholds (0.5, 1.0, 2.0, 4.0 Å).
+    """Local Distance Difference Test (lDDT) with thresholds (0.5, 1.0, 2.0, 4.0 Å) and inclusion radius `cutoff`.
+
+    The global score pools every scored distance pair, matching AlphaFold `lddt(per_residue=False)`
+    and OpenStructure. No stereochemistry checks are applied.
 
     Returns:
         (global_lddt, per_residue_lddt)
@@ -175,7 +180,13 @@ def analyze_interface_physics(
     target_chain: str = "A",
     binder_chain: str = "B",
 ) -> Tuple[int, int, int, int, NDArray[np.uintp]]:
-    """Compute `(interface_contacts, h_bonds, salt_bridges, buns_count, buns_indices)` in a single pass."""
+    """Compute `(interface_contacts, polar_contacts, salt_bridges, buns_count, buns_indices)` in a single pass.
+
+    All terms are distance heuristics: contacts are heavy-atom pairs within 4.5 Å; polar contacts are
+    cross-chain N/O pairs within 3.5 Å (no angle or donor/acceptor check); a polar atom within 5 Å of the
+    other chain is counted as buried and unsatisfied if no other N/O lies within 3.9 Å. This is not
+    Rosetta `BuriedUnsatHbonds`.
+    """
     ...
 
 def calculate_sasa(
@@ -192,8 +203,14 @@ def calculate_bsa(
     binder_coords: NDArray[np.float32],
     probe_radius: float = 1.4,
     n_points: int = 96,
+    target_radii: Optional[NDArray[np.float32]] = None,
+    binder_radii: Optional[NDArray[np.float32]] = None,
 ) -> Tuple[float, float, float, float]:
-    """Compute buried surface area returning `(bsa_total, sasa_target, sasa_binder, sasa_complex)` (Å²)."""
+    """Compute buried surface area returning `(bsa_total, sasa_target, sasa_binder, sasa_complex)` (Å²).
+
+    Without radii every atom gets 1.70 Å, which overestimates BSA by a few percent relative to
+    element radii. Pass per-atom van der Waals radii for results comparable to FreeSASA.
+    """
     ...
 
 def calculate_ph_switch_ddg(

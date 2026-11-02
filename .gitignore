@@ -25,6 +25,7 @@ id_*
 !trajectory.pdb
 benchmarks/data/
 test_*.py
+!tests/test_*.py
 *.dat
 *.dcd
 

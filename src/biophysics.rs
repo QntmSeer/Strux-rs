@@ -81,7 +81,8 @@ pub fn batch_pose_and_sc_rmsd(
 
 pub struct InterfacePhysicsResult {
     pub interface_contacts: usize,
-    pub h_bonds: usize,
+    /// N/O pairs across the interface within 3.5 A (distance only; no angle or donor/acceptor check).
+    pub polar_contacts: usize,
     pub salt_bridges: usize,
     pub buns_count: usize,
     pub buns_indices: Vec<usize>,
@@ -140,7 +141,7 @@ pub fn analyze_interface_physics(
     let cutoff_sat_sq = 3.9f32 * 3.9f32;
 
     let mut interface_contacts = 0usize;
-    let mut h_bonds = 0usize;
+    let mut polar_contacts = 0usize;
     let mut salt_bridges = 0usize;
 
     let mut is_buried_interface = vec![false; n];
@@ -167,7 +168,7 @@ pub fn analyze_interface_physics(
             }
             if pt && is_polar_atom(&atom_names[bi]) {
                 if d2 <= cutoff_hbond_sq {
-                    h_bonds += 1;
+                    polar_contacts += 1;
                 }
                 if d2 <= cutoff_salt_sq {
                     let cat_b = is_cationic_atom(&res_names[bi], &atom_names[bi]);
@@ -226,7 +227,7 @@ pub fn analyze_interface_physics(
 
     InterfacePhysicsResult {
         interface_contacts,
-        h_bonds,
+        polar_contacts,
         salt_bridges,
         buns_count: buns_indices.len(),
         buns_indices,
@@ -318,17 +319,35 @@ pub fn calculate_sasa(
 pub fn calculate_bsa(
     target_coords: &[[f32; 3]],
     binder_coords: &[[f32; 3]],
+    target_radii: Option<&[f32]>,
+    binder_radii: Option<&[f32]>,
     probe_radius: f32,
     n_points: usize,
 ) -> (f32, f32, f32, f32) {
-    let (sasa_target, _) = calculate_sasa(target_coords, None, probe_radius, n_points);
-    let (sasa_binder, _) = calculate_sasa(binder_coords, None, probe_radius, n_points);
+    let (sasa_target, _) = calculate_sasa(target_coords, target_radii, probe_radius, n_points);
+    let (sasa_binder, _) = calculate_sasa(binder_coords, binder_radii, probe_radius, n_points);
 
     let mut complex_coords = Vec::with_capacity(target_coords.len() + binder_coords.len());
     complex_coords.extend_from_slice(target_coords);
     complex_coords.extend_from_slice(binder_coords);
 
-    let (sasa_complex, _) = calculate_sasa(&complex_coords, None, probe_radius, n_points);
+    // Complex radii: concatenate, falling back to the 1.70 A default for a side given none.
+    let complex_radii: Option<Vec<f32>> = if target_radii.is_some() || binder_radii.is_some() {
+        let mut r = Vec::with_capacity(complex_coords.len());
+        match target_radii {
+            Some(t) => r.extend_from_slice(t),
+            None => r.extend(std::iter::repeat(1.70f32).take(target_coords.len())),
+        }
+        match binder_radii {
+            Some(b) => r.extend_from_slice(b),
+            None => r.extend(std::iter::repeat(1.70f32).take(binder_coords.len())),
+        }
+        Some(r)
+    } else {
+        None
+    };
+
+    let (sasa_complex, _) = calculate_sasa(&complex_coords, complex_radii.as_deref(), probe_radius, n_points);
     let bsa = (sasa_target + sasa_binder - sasa_complex).max(0.0);
     (bsa, sasa_target, sasa_binder, sasa_complex)
 }
