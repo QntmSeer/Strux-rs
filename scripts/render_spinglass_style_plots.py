@@ -178,9 +178,10 @@ def make_benchmark_scaling():
     )
 
     fig.tight_layout(w_pad=2.4)
-    fig.savefig("benchmark_scaling.png", bbox_inches="tight", dpi=220)
+    Path("benchmarks").mkdir(exist_ok=True)
+    fig.savefig("benchmarks/benchmark_scaling.png", bbox_inches="tight", dpi=220)
     plt.close(fig)
-    print("wrote benchmark_scaling.png")
+    print("wrote benchmarks/benchmark_scaling.png")
 
 
 # ==============================================================================
@@ -270,9 +271,10 @@ def make_hardware_soak():
     ax_p.set_xlim(0, 355)
 
     fig.tight_layout(h_pad=1.0)
-    fig.savefig("hardware_soak_telemetry.png", bbox_inches="tight", dpi=220)
+    Path("benchmarks").mkdir(exist_ok=True)
+    fig.savefig("benchmarks/hardware_soak_telemetry.png", bbox_inches="tight", dpi=220)
     plt.close(fig)
-    print("wrote hardware_soak_telemetry.png")
+    print("wrote benchmarks/hardware_soak_telemetry.png")
 
 
 # ==============================================================================

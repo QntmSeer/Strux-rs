@@ -62,7 +62,7 @@ Head-to-head comparison across standard computational biology packages on identi
 | | MDTraj | 2.24 ms | 8,912.2 fps | 26.5× |
 | | **`strux-rs` (SIMD)** | **0.29 ms** | **68,770.8 fps** | **204×** |
 
-![Gold-Standard Ecosystem Benchmark](benchmarks/gold_standard_comparison.png)
+![Gold-Standard Ecosystem Benchmark](benchmarks/gold_standard_comparison.png?v=0.4.0)
 
 ### 2. AMS Biophysics, Binary Trajectory Readers & Zero-Copy Accelerators
 
@@ -77,7 +77,7 @@ Head-to-head comparison across standard computational biology packages on identi
 | **MSA `uint8` Tensor** (`tokens_np`) | 1,024 seqs × 73 residues | 8.40 ms (Python) | **12.6 µs** | **664×** | Exact byte-for-byte match |
 | **GPU Contact Map** (`cuda_contact_frequency`) | 1,919 × 1,919 grid | 3,677.7 ms (NumPy) | **188.8 ms** | **19.5×** | `0.00e+00` exact parity |
 
-![New Features Verification](benchmarks/new_features_verification.png)
+![New Features Verification](benchmarks/new_features_verification.png?v=0.4.0)
 
 ### 3. Pairwise Trajectory RMSD ($O(T^2)$) & Macromolecular Size Scaling
 
@@ -88,7 +88,7 @@ Head-to-head comparison across standard computational biology packages on identi
 | 2,500 | 6,250,000 | 11.8s | 3.211s | 1,946,400 pairs/s | 3.7× |
 | 5,000 | 25,000,000 | 47.0s | 12.169s | **2,054,488 pairs/s** | **3.9×** |
 
-![Benchmark Scaling](benchmarks/benchmark_scaling.png)
+![Benchmark Scaling](benchmarks/benchmark_scaling.png?v=0.4.0)
 
 ### 4. Hardware Scaling & VRAM Capacity: NVIDIA L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
 
@@ -105,7 +105,7 @@ To evaluate GPU scaling beyond the laptop thermal and memory envelope, the exact
 | **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.96 ms | **8.30 ms** | **90.6× vs pure Python** |
 | **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,477.5 ms | **7,441.5 ms** | **1,793.8× vs Python** (7.4s vs ~3.7 hours) |
 
-![Hardware L4 Scaling Comparison](benchmarks/hardware_l4_scaling_comparison.png)
+![Hardware L4 Scaling Comparison](benchmarks/hardware_l4_scaling_comparison.png?v=0.4.0)
 
 ### 5. Prolonged 5-Minute Full-System Hardware Burn (`309.3s` Concurrent 16T CPU + CUDA GPU)
 Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5%` mean utilization)** and **100% CUDA GPU saturation** inside a shared laptop thermal envelope:
@@ -117,7 +117,7 @@ Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5
   * **AF-Cluster `cluster_msa`**: `14,630,000` sequences clustered (`3.66 billion` amino acid residues)
   * **Markov State Steps**: `731,500,000` state transitions solved
 
-![Hardware Soak Telemetry](benchmarks/hardware_soak_telemetry.png)
+![Hardware Soak Telemetry](benchmarks/hardware_soak_telemetry.png?v=0.4.0)
 
 ---
 
