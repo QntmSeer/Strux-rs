@@ -39,7 +39,9 @@ pub fn parse_dcd_trajectory_selected<P: AsRef<Path>>(
     }
 
     let nframes_header = i32::from_le_bytes(data[8..12].try_into().unwrap()).max(0) as usize;
-    let has_unitcell = i32::from_le_bytes(data[44..48].try_into().unwrap()) == 1;
+    // In DCD format, unitcell flag can be at int[9] (offset 44) or int[10] (offset 48, CHARMM/OpenMM standard)
+    let has_unitcell = i32::from_le_bytes(data[44..48].try_into().unwrap()) == 1
+        || i32::from_le_bytes(data[48..52].try_into().unwrap()) == 1;
 
     // Advance past block 1: 4 + 84 + 4 = 92 bytes
     let mut offset = 92usize;

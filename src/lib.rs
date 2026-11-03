@@ -468,13 +468,13 @@ fn cuda_driver_loadable() -> bool {
 /// cudarc panics when the driver library is absent or lacks CUDA 12 symbols, so the driver is
 /// probed first (the common no-GPU case, silent) and any remaining panic is caught.
 #[cfg(feature = "cuda")]
-fn new_gpu_engine(device_id: usize) -> PyResult<cuda::GpuTrajectoryEngine> {
+fn new_gpu_engine(device_id: usize) -> PyResult<std::sync::Arc<cuda::GpuTrajectoryEngine>> {
     if !cuda_driver_loadable() {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
             "NVIDIA driver library (libcuda.so / nvcuda.dll) not found. {CUDA_REQUIREMENTS}."
         )));
     }
-    match std::panic::catch_unwind(|| cuda::GpuTrajectoryEngine::new(device_id)) {
+    match std::panic::catch_unwind(|| cuda::GpuTrajectoryEngine::get_or_create(device_id)) {
         Ok(Ok(engine)) => Ok(engine),
         Ok(Err(e)) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
             "CUDA init error: {e:?}. {CUDA_REQUIREMENTS}."

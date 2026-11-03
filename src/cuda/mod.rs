@@ -1,14 +1,33 @@
 // ponytail: Rust CUDA driver for QCP trajectory calculations and clustering via cudarc.
+pub mod nvtx;
+
 use cudarc::driver::{CudaDevice, DriverError, LaunchAsync, LaunchConfig};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 
 pub const PTX_SRC: &str = include_str!(concat!(env!("OUT_DIR"), "/qcp.ptx"));
+
+// ponytail: Process-wide singleton cache per device ID.
+// Eliminates the ~200 ms driver context recreation and PTX JIT compilation on repeated calls.
+static ENGINES: OnceLock<Mutex<HashMap<usize, Arc<GpuTrajectoryEngine>>>> = OnceLock::new();
 
 pub struct GpuTrajectoryEngine {
     dev: Arc<CudaDevice>,
 }
 
 impl GpuTrajectoryEngine {
+    /// Retrieve an existing cached engine for `device_id` or initialize and cache a new one.
+    pub fn get_or_create(device_id: usize) -> Result<Arc<Self>, DriverError> {
+        let engines = ENGINES.get_or_init(|| Mutex::new(HashMap::new()));
+        let mut map = engines.lock().unwrap();
+        if let Some(engine) = map.get(&device_id) {
+            return Ok(Arc::clone(engine));
+        }
+        let engine = Arc::new(Self::new(device_id)?);
+        map.insert(device_id, Arc::clone(&engine));
+        Ok(engine)
+    }
+
     pub fn new(device_id: usize) -> Result<Self, DriverError> {
         let dev = CudaDevice::new(device_id)?;
         dev.load_ptx(
@@ -27,6 +46,7 @@ impl GpuTrajectoryEngine {
     }
 
     /// Computes pairwise RMSD matrix [num_frames, num_frames] on GPU using Theobald QCP.
+    /// Uses 2D block tiling for large trajectories (>16,384 frames) to prevent VRAM OOM on 4GB GPUs.
     pub fn pairwise_rmsd(
         &self,
         flat_coords: &[f32], // [num_frames, num_atoms, 3]
@@ -37,62 +57,124 @@ impl GpuTrajectoryEngine {
             return Ok(Vec::new());
         }
 
+        let _nvtx_all = nvtx::NvtxRange::new("strux_pairwise_rmsd");
+
         // 1. Upload raw coordinates to device
-        let d_coords = self.dev.htod_sync_copy(flat_coords)?;
+        let d_coords = {
+            let _nvtx = nvtx::NvtxRange::new("upload_coords");
+            self.dev.htod_sync_copy(flat_coords)?
+        };
 
         // 2. Allocate centered coords buffer and norms buffer
         let mut d_centered = self.dev.alloc_zeros::<f32>(num_frames * num_atoms * 3)?;
         let mut d_norms = self.dev.alloc_zeros::<f32>(num_frames)?;
 
         // 3. Launch Pass 1: Center coordinates & precompute norms
-        let center_fn = self.dev.get_func("qcp_module", "center_and_norms_kernel").unwrap();
-        let threads_x = 128;
-        let blocks_x = num_frames.div_ceil(threads_x);
-        let cfg_center = LaunchConfig {
-            grid_dim: (blocks_x as u32, 1, 1),
-            block_dim: (threads_x as u32, 1, 1),
-            shared_mem_bytes: 0,
-        };
-        unsafe {
-            center_fn.launch(
-                cfg_center,
-                (&d_coords, &mut d_centered, &mut d_norms, num_frames as i32, num_atoms as i32),
-            )?;
+        {
+            let _nvtx = nvtx::NvtxRange::new("center_and_norms");
+            let center_fn = self.dev.get_func("qcp_module", "center_and_norms_kernel").unwrap();
+            let threads_x = 128;
+            let blocks_x = num_frames.div_ceil(threads_x);
+            let cfg_center = LaunchConfig {
+                grid_dim: (blocks_x as u32, 1, 1),
+                block_dim: (threads_x as u32, 1, 1),
+                shared_mem_bytes: 0,
+            };
+            unsafe {
+                center_fn.launch(
+                    cfg_center,
+                    (&d_coords, &mut d_centered, &mut d_norms, num_frames as i32, num_atoms as i32),
+                )?;
+            }
         }
 
-        // 4. Allocate distance matrix in device memory
-        let mut d_dist = self.dev.alloc_zeros::<f32>(num_frames * num_frames)?;
-
-        // 5. Launch Pass 2: Tiled QCP RMSD Kernel
         let qcp_fn = self.dev.get_func("qcp_module", "pairwise_qcp_tiled_kernel").unwrap();
         let tile_dim = 16;
-        let grid_x = num_frames.div_ceil(tile_dim);
-        let grid_y = num_frames.div_ceil(tile_dim);
-        let cfg_qcp = LaunchConfig {
-            grid_dim: (grid_x as u32, grid_y as u32, 1),
-            block_dim: (tile_dim as u32, tile_dim as u32, 1),
-            shared_mem_bytes: 0,
-        };
+        let max_oneshot_frames = 20480;
 
-        unsafe {
-            qcp_fn.launch(
-                cfg_qcp,
-                (
-                    &d_centered,
-                    &d_norms,
-                    &mut d_dist,
-                    num_frames as i32,
-                    num_atoms as i32,
-                    0i32, // row_offset
-                    0i32, // col_offset
-                    num_frames as i32,
-                    num_frames as i32,
-                ),
-            )?;
+        // ponytail: If full distance matrix fits comfortably in GPU memory (<= 1.6 GB, <= 20,480 frames),
+        // compute in one shot. Otherwise, tile across 2D blocks to prevent OOM on 4 GB laptop GPUs (A2000).
+        if num_frames <= max_oneshot_frames {
+            let mut d_dist = self.dev.alloc_zeros::<f32>(num_frames * num_frames)?;
+            let grid_x = num_frames.div_ceil(tile_dim);
+            let grid_y = num_frames.div_ceil(tile_dim);
+            let cfg_qcp = LaunchConfig {
+                grid_dim: (grid_x as u32, grid_y as u32, 1),
+                block_dim: (tile_dim as u32, tile_dim as u32, 1),
+                shared_mem_bytes: 0,
+            };
+
+            {
+                let _nvtx = nvtx::NvtxRange::new("qcp_tiled_solve_oneshot");
+                unsafe {
+                    qcp_fn.clone().launch(
+                        cfg_qcp,
+                        (
+                            &d_centered,
+                            &d_norms,
+                            &mut d_dist,
+                            num_frames as i32,
+                            num_atoms as i32,
+                            0i32,
+                            0i32,
+                            num_frames as i32,
+                            num_frames as i32,
+                        ),
+                    )?;
+                }
+            }
+
+            let _nvtx = nvtx::NvtxRange::new("download_matrix");
+            return self.dev.dtoh_sync_copy(&d_dist);
         }
 
-        // 6. Download distance matrix to host
-        let host_dist = self.dev.dtoh_sync_copy(&d_dist)?;
+        // Tiled block computation for massive trajectories
+        let chunk_size = 8192;
+        let mut host_dist = vec![0.0f32; num_frames * num_frames];
+        let mut d_tile = self.dev.alloc_zeros::<f32>(chunk_size * chunk_size)?;
+
+        let _nvtx_tiles = nvtx::NvtxRange::new("qcp_tiled_solve_blocks");
+        for r_start in (0..num_frames).step_by(chunk_size) {
+            let r_len = (num_frames - r_start).min(chunk_size);
+            for c_start in (0..num_frames).step_by(chunk_size) {
+                let c_len = (num_frames - c_start).min(chunk_size);
+
+                let grid_x = c_len.div_ceil(tile_dim);
+                let grid_y = r_len.div_ceil(tile_dim);
+                let cfg_qcp = LaunchConfig {
+                    grid_dim: (grid_x as u32, grid_y as u32, 1),
+                    block_dim: (tile_dim as u32, tile_dim as u32, 1),
+                    shared_mem_bytes: 0,
+                };
+
+                unsafe {
+                    qcp_fn.clone().launch(
+                        cfg_qcp,
+                        (
+                            &d_centered,
+                            &d_norms,
+                            &mut d_tile,
+                            num_frames as i32,
+                            num_atoms as i32,
+                            r_start as i32,
+                            c_start as i32,
+                            r_len as i32,
+                            c_len as i32,
+                        ),
+                    )?;
+                }
+
+                // Copy tile from device back to host
+                let tile_data = self.dev.dtoh_sync_copy(&d_tile)?;
+                for r in 0..r_len {
+                    let src_offset = r * c_len;
+                    let dst_offset = (r_start + r) * num_frames + c_start;
+                    host_dist[dst_offset..dst_offset + c_len]
+                        .copy_from_slice(&tile_data[src_offset..src_offset + c_len]);
+                }
+            }
+        }
+
         Ok(host_dist)
     }
 
@@ -105,6 +187,7 @@ impl GpuTrajectoryEngine {
         num_atoms: usize,
         cutoff: f32,
     ) -> Result<(Vec<i32>, Vec<i32>), DriverError> {
+        let _nvtx = nvtx::NvtxRange::new("strux_cluster_daura");
         let dist_matrix = self.pairwise_rmsd(flat_coords, num_frames, num_atoms)?;
 
         // Upload distance matrix and run clustering logic
@@ -186,6 +269,7 @@ impl GpuTrajectoryEngine {
         num_res: usize,
         cutoff: f32,
     ) -> Result<Vec<u64>, DriverError> {
+        let _nvtx = nvtx::NvtxRange::new("strux_contact_map_bitmask");
         let num_u64_per_frame = (num_res * num_res).div_ceil(64);
         let mut host_bitmask = Vec::with_capacity(num_frames * num_u64_per_frame);
 
@@ -245,6 +329,7 @@ impl GpuTrajectoryEngine {
             return Ok(Vec::new());
         }
 
+        let _nvtx = nvtx::NvtxRange::new("strux_contact_frequency");
         let d_coords = self.dev.htod_sync_copy(flat_coords)?;
         let mut d_freq = self.dev.alloc_zeros::<f32>(num_res * num_res)?;
 
@@ -276,4 +361,3 @@ impl GpuTrajectoryEngine {
         Ok(host_freq)
     }
 }
-
