@@ -5,29 +5,29 @@ CPU: Intel(R) Xeon(R) Platinum 8468 (16 threads) | GPU: NVIDIA H100 80GB HBM3 (8
 
 [Suite 1] Real-World Therapeutic Discovery .cif Triage at Scale
   -> Generating 50 multi-chain Boltz-2 schema .cif structures (290 res, ~1,450 heavy atoms each)...
-  1A. Parse 1,000 .cif complexes (+pLDDT): strux-rs = 625.11 ms | Python = 3930.8 ms (6.3x)
-  1B. Target-Anchored Pose+scRMSD (10,000 designs): strux-rs = 2.85 ms | NumPy SVD = 990.9 ms (348.2x, err=1.55e-06 A)
-  1C. All-Atom Interface Physics + BUNS (1,000 complexes): strux-rs = 1716.0 ms | Python O(N^2) = 23616.3 ms (13.8x)
-  1D. Shrake-Rupley BSA (810+495 atoms): strux-rs = 1.069 ms | Python = 116.8 ms (109.3x)
-  1E-i. Debye-Hückel pH-Switch ddG (pH 6.0 vs 7.4): strux-rs = 0.2595 ms | Python = 18.002 ms (69.4x)
-  1E-ii. ANM Normal Modes (180 C-alpha): strux-rs = 119.65 ms | Python/NumPy = 66.54 ms (0.6x)
+  1A. Parse 1,000 .cif complexes (+pLDDT): strux-rs = 605.59 ms | Python = 3954.5 ms (6.5x)
+  1B. Target-Anchored Pose+scRMSD (10,000 designs): strux-rs = 2.95 ms | NumPy SVD = 1057.2 ms (357.9x, err=1.55e-06 A)
+  1C. All-Atom Interface Physics + BUNS (1,000 complexes): strux-rs = 1869.6 ms | Python O(N^2) = 23889.2 ms (12.8x)
+  1D. Shrake-Rupley BSA (810+495 atoms): strux-rs = 1.139 ms | Python = 122.6 ms (107.6x)
+  1E-i. Debye-Hückel pH-Switch ddG (pH 6.0 vs 7.4): strux-rs = 0.2650 ms | Python = 19.286 ms (72.8x)
+  1E-ii. ANM Normal Modes (180 C-alpha): strux-rs = 117.61 ms | Python/NumPy = 69.35 ms (0.6x)
 
 [Suite 2] Explicit-Solvent .xtc & .dcd Solute-Filtered AMS Loop & GPU VRAM Scaling
-  2A-i. Solvated .xtc (200f x 40000 atoms -> 400 CA): Full = 65.5 ms (91.6 MB) | Solute-Filtered = 31.9 ms (0.92 MB, 100x RAM reduction)
-  2A-ii. Solvated .dcd (200f x 40000 atoms -> 400 CA): Full = 87.3 ms (91.6 MB) | Solute-Filtered = 2.5 ms (0.92 MB, 35.6x faster)
-  2B-CPU. Rayon CPU pairwise_rmsd (1,000 x 1,000, 250 atoms): 219.53 ms
-  2B-GPU. cuda_pairwise_rmsd (1,000 x 1,000 = 1.0M pairs): GPU = 150.25 ms (IQR 2.71 ms) | 1.66 B atom-pairs/s | 1.46x vs CPU
-  2B-GPU. cuda_pairwise_rmsd (2,500 x 2,500 = 6.2M pairs): GPU = 167.07 ms (IQR 12.14 ms) | 9.35 B atom-pairs/s | 8.21x vs CPU
-  2B-GPU. cuda_pairwise_rmsd (5,000 x 5,000 = 25.0M pairs): GPU = 258.05 ms (IQR 3.84 ms) | 24.22 B atom-pairs/s | 21.27x vs CPU
-  2B-GPU. cuda_pairwise_rmsd (10,000 x 10,000 = 100.0M pairs): GPU = 583.70 ms (IQR 1.19 ms) | 42.83 B atom-pairs/s | 37.61x vs CPU
-  2B-GPU. cuda_pairwise_rmsd (15,000 x 15,000 = 225.0M pairs): GPU = 1123.75 ms (IQR 4.06 ms) | 50.06 B atom-pairs/s | 43.95x vs CPU
-  2B-GPU. cuda_pairwise_rmsd (20,000 x 20,000 = 400.0M pairs): GPU = 1882.57 ms (IQR 4.67 ms) | 53.12 B atom-pairs/s | 46.64x vs CPU
-  2C. Complete 5,000-Frame AMS Loop (lDDT + PCA + GPU Daura + GPU ContactFreq + MSM): 4821.68 ms (IQR 58.94 ms)
+  2A-i. Solvated .xtc (200f x 40000 atoms -> 400 CA): Full = 68.7 ms (91.6 MB) | Solute-Filtered = 33.0 ms (0.92 MB, 100x RAM reduction)
+  2A-ii. Solvated .dcd (200f x 40000 atoms -> 400 CA): Full = 91.7 ms (91.6 MB) | Solute-Filtered = 2.6 ms (0.92 MB, 35.1x faster)
+  2B-CPU. Rayon CPU pairwise_rmsd (1,000 x 1,000, 250 atoms): 223.61 ms
+  2B-GPU. cuda_pairwise_rmsd (1,000 x 1,000 = 1.0M pairs): GPU = 2.12 ms (IQR 0.36 ms) | 117.87 B atom-pairs/s | 105.43x vs CPU
+  2B-GPU. cuda_pairwise_rmsd (2,500 x 2,500 = 6.2M pairs): GPU = 10.64 ms (IQR 2.31 ms) | 146.87 B atom-pairs/s | 131.37x vs CPU
+  2B-GPU. cuda_pairwise_rmsd (5,000 x 5,000 = 25.0M pairs): GPU = 107.71 ms (IQR 0.31 ms) | 58.03 B atom-pairs/s | 51.90x vs CPU
+  2B-GPU. cuda_pairwise_rmsd (10,000 x 10,000 = 100.0M pairs): GPU = 428.71 ms (IQR 0.39 ms) | 58.31 B atom-pairs/s | 52.16x vs CPU
+  2B-GPU. cuda_pairwise_rmsd (15,000 x 15,000 = 225.0M pairs): GPU = 969.21 ms (IQR 5.36 ms) | 58.04 B atom-pairs/s | 51.91x vs CPU
+  2B-GPU. cuda_pairwise_rmsd (20,000 x 20,000 = 400.0M pairs): GPU = 1704.25 ms (IQR 22.98 ms) | 58.68 B atom-pairs/s | 52.48x vs CPU
+  2C. Complete 5,000-Frame AMS Loop (lDDT + PCA + GPU Daura + GPU ContactFreq + MSM): 4698.49 ms (IQR 79.47 ms)
 
 [Suite 3] 100,000-Sequence MPNN Developability / k-mer Novelty & AF-Cluster MSA
-  3A. screen_sequences_biophysics (100,000 MPNN sequences): strux-rs = 67.19 ms | Python = 1614.8 ms (24.0x)
-  3B. sliding_kmer_novelty (5,000 queries x 500 refs, k=15): strux-rs = 5628.93 ms | Python = 19414844.9 ms (3449.1x)
-  3C. Zero-Copy .a3m Parse + tokens_np + cluster_msa (5,000 x 256): 5.27 ms (IQR 0.29 ms)
+  3A. screen_sequences_biophysics (100,000 MPNN sequences): strux-rs = 104.97 ms | Python = 1735.8 ms (16.5x)
+  3B. sliding_kmer_novelty (5,000 queries x 500 refs, k=15): strux-rs = 5809.07 ms | Python = 19320503.0 ms (3325.9x)
+  3C. Zero-Copy .a3m Parse + tokens_np + cluster_msa (5,000 x 256): 4.76 ms (IQR 0.11 ms)
 
 ========================================================================================
 Saved JSON -> /home/ubuntu/strux-rs/benchmarks/standardized_results_h100_80gb_hbm3.json
