@@ -101,6 +101,16 @@ def run():
             out[f"{fmt}_max_abs_diff_A"] = float(np.max(np.abs(reader(path) - ref)))
             out[f"{fmt}_subset_max_abs_diff_A"] = float(np.max(np.abs(reader(path, atom_indices=ca) - ref[:, ca])))
 
+        # Periodic box: explicit-solvent MD (OpenMM, NAMD, CHARMM) writes a unit-cell record before
+        # every DCD frame. strux-rs <= 0.5.1 missed the flag and returned wrong coordinates (~95 A off).
+        boxed = md.Trajectory(t.xyz, t.topology,
+                              unitcell_lengths=np.tile([8.0, 8.0, 8.0], (t.n_frames, 1)),
+                              unitcell_angles=np.tile([90.0, 90.0, 90.0], (t.n_frames, 1)))
+        dcd_box = str(Path(d) / "t_box.dcd")
+        boxed.save_dcd(dcd_box)
+        ref = md.load(dcd_box, top=t.topology).xyz * 10.0
+        out["dcd_unitcell_max_abs_diff_A"] = float(np.max(np.abs(sx.parse_dcd(dcd_box) - ref)))
+
     out["kabsch_rmsd_max_abs_diff_A"] = max(
         abs(sx.calculate_rmsd_kabsch(f0, xyz[i]) - kabsch_rmsd(f0, xyz[i])) for i in range(1, t.n_frames))
     rg_ref = md.compute_rg(t) * 10.0
@@ -147,6 +157,7 @@ def run():
 ROWS = [
     ("XTC read, full and atom subset", "MDTraj", "max(xtc_max_abs_diff_A, xtc_subset_max_abs_diff_A)", "{:.1e} Å"),
     ("DCD read, full and atom subset", "MDTraj", "max(dcd_max_abs_diff_A, dcd_subset_max_abs_diff_A)", "{:.1e} Å"),
+    ("DCD read, periodic box (unit cell)", "MDTraj", "dcd_unitcell_max_abs_diff_A", "{:.1e} Å"),
     ("Kabsch RMSD", "NumPy SVD (float64)", "kabsch_rmsd_max_abs_diff_A", "{:.1e} Å"),
     ("Target-anchored pose RMSD", "NumPy SVD (float64)", "pose_rmsd_max_abs_diff_A", "{:.1e} Å"),
     ("Binder-only RMSD", "NumPy SVD (float64)", "binder_rmsd_max_abs_diff_A", "{:.1e} Å"),

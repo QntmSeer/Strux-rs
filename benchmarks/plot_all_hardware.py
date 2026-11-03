@@ -115,7 +115,7 @@ def main():
         """Version plus commit, since __version__ alone cannot distinguish a local build."""
         ver = data.get("strux_rs_version", "unknown")
         commit = data.get("git_commit")
-        return f"{ver} ({commit})" if commit and commit != "unknown" else ver
+        return f"{ver} ({commit})" if commit and commit != "unknown" else f"{ver}, no commit recorded"
 
     h100_b = {b["benchmark"]: b for b in h100_data.get("benchmarks", [])}
     l4_b = {b["benchmark"]: b for b in l4_data.get("benchmarks", [])}
@@ -203,7 +203,7 @@ def main():
     titles(
         ax1,
         f"H100 peaks at {peak_h100:.0f}M alignments/s, {rate_h100[-1]:.0f}M at 400M pairs",
-        f"250 atoms/frame, strux-rs {build_label(h100_data)}; peak at {peak_frames:,} frames; "
+        f"250 atoms/frame; H100 peak at {peak_frames:,} frames; "
         f"400M pairs in {time_max_h100:.2f}s ({atom_pairs_rate_h100:.1f}B atom-pairs/s)",
     )
 
@@ -286,10 +286,14 @@ def main():
     titles(
         ax2,
         f"Zero-C primitives accelerate pipelines {min_sp:.0f}x to {max_sp:,.0f}x",
-        f"strux-rs {build_label(h100_data)}; each speedup measured vs Python on that machine's CPU",
+        "each speedup measured vs Python on that machine's CPU",
     )
 
     fig.tight_layout(w_pad=3.8)
+    fig.text(0.01, -0.03,
+             f"strux-rs builds: RTX A2000 {build_label(a2000_data)}; L4 {build_label(l4_data)}; "
+             f"H100 {build_label(h100_data)}. Each value is read from benchmarks/standardized_results_*.json.",
+             fontsize=6.0, color=INK2, ha="left", va="top")
 
     out_all = bdir / "hardware_scaling_comparison.png"
     fig.savefig(out_all, bbox_inches="tight", dpi=240)

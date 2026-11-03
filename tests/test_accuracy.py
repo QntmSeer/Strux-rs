@@ -22,6 +22,7 @@ def res():
 @pytest.mark.parametrize("key", [
     "xtc_max_abs_diff_A", "xtc_subset_max_abs_diff_A",  # XTC is stored at 1e-3 nm precision
     "dcd_max_abs_diff_A", "dcd_subset_max_abs_diff_A",
+    "dcd_unitcell_max_abs_diff_A",  # regression: <= 0.5.1 misread boxed DCD files by ~95 A
 ])
 def test_trajectory_readers_match_mdtraj(res, key):
     assert res[key] < 1e-4
