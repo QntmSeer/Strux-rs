@@ -115,7 +115,7 @@ def plain_log_axis(ax, axis="y"):
 # 1. benchmark_scaling.png
 # ==============================================================================
 def make_benchmark_scaling():
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.4, 2.85))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.6, 2.95))
 
     # Left panel: Pairwise RMSD throughput scaling
     t_steps = np.array([100, 250, 500, 1000, 2500, 5000], dtype=float)
@@ -140,8 +140,8 @@ def make_benchmark_scaling():
 
     titles(
         ax1,
-        "CUDA QCP reaches 2.05M alignments/s as T^2 grows",
-        "1,919-atom GFP; T = 100 to 5,000 frames; max |GPU - SVD| = 2.67e-5 A",
+        "CUDA QCP reaches 2.05M alignments/s (0.4.x kernel)",
+        "1,919-atom GFP, T = 100 to 5,000 frames; RTX A2000 vs 16T i9",
     )
 
     # Right panel: Biological size scaling
@@ -154,11 +154,10 @@ def make_benchmark_scaling():
     ax2.text(
         2.5,
         1.08,
-        "16T CPU parity",
-        fontsize=6.4,
+        "CPU parity",
+        fontsize=6.0,
         color=INK2,
         ha="center",
-        bbox=dict(facecolor=PAPER, edgecolor="none", pad=1.0),
     )
 
     for i, (x, y, col) in enumerate(zip(xs, speedups, cols)):
@@ -173,11 +172,11 @@ def make_benchmark_scaling():
     ax2.set_ylabel("GPU speedup over 16T CPU")
     titles(
         ax2,
-        "GPU speedup saturates near 3.9x at macromolecular scale",
-        "T = 1,000 frames (1e6 pairs); RTX A2000 (4 GB VRAM) vs 16T Core i9",
+        "GPU speedup saturates near 3.9x (0.4.x kernel)",
+        "T = 1,000 frames (1e6 pairs); RTX A2000 vs 16T Core i9",
     )
 
-    fig.tight_layout(w_pad=2.4)
+    fig.tight_layout(w_pad=4.0)
     Path("benchmarks").mkdir(exist_ok=True)
     fig.savefig("benchmarks/benchmark_scaling.png", bbox_inches="tight", dpi=220)
     plt.close(fig)
@@ -239,7 +238,7 @@ def make_hardware_soak():
     titles(
         ax_t,
         "Prolonged 5-minute full-system burn stabilizes 16 C below thermal throttle",
-        "309.3s on agni: 600M CUDA QCP pairs + 5,658 lDDT (815B pairs) + 1.46M XTC frames + 14.6M MSA seqs",
+        "0.4.x build, RTX A2000 laptop, 309.3 s: 600M CUDA QCP pairs + 5,658 lDDT + 1.46M XTC frames + 14.6M MSA seqs",
     )
 
     # Panel 2: 16-Thread CPU Utilization (%)
@@ -296,7 +295,7 @@ def make_gold_standard():
         ("Google JAX (vmap JIT)", 76612.5, OCHRE, "D", "172x"),
         ("ProDy (C-Kabsch)", 92281.5, GRAYS[0], "s", "207x"),
         ("strux-rs (16T Rayon)", 596176.5, COBALT, "s", "1,335x"),
-        ("strux-rs (CUDA QCP)", 1941698.0, RUST, "o", "4,348x"),
+        ("strux-rs (CUDA QCP, 0.4.x)", 1941698.0, RUST, "o", "4,348x"),
     ]
 
     ys = np.arange(len(methods))
@@ -318,7 +317,7 @@ def make_gold_standard():
     titles(
         ax1,
         "Pairwise RMSD: CUDA is 21x faster than ProDy (4,348x vs Biopython)",
-        "PDB 2K39 (116 models, 13,456 pairs) on Core i9-11950H + RTX A2000; Biopython/SciPy scaled from 500 pairs",
+        "PDB 2K39 (116 models, 13,456 pairs), i9-11950H + RTX A2000; CUDA bar is the 0.4.x kernel; Biopython/SciPy scaled from 500 pairs",
     )
 
     # Panel B (bottom left): GFP Rg throughput
@@ -388,7 +387,7 @@ def make_new_features():
         ("PCA SVD\n(2500x1500)", 5.1, JADE, "190 ms vs 978 ms"),
         ("XTC Read\n(500x1000)", 7.3, OCHRE, "5.3 ms vs 39.0 ms"),
         ("MSA Cluster\n(10k x 250)", 33.8, COBALT, "22.2 ms vs 750 ms"),
-        ("AlphaFold lDDT\n(4,000 atoms)", 201.2, RUST, "4.69 ms vs 943 ms"),
+        ("lDDT\n(4,000 atoms)", 201.2, RUST, "4.69 ms vs 943 ms"),
     ]
     ys1 = np.arange(len(tasks))
     ax1.grid(False)

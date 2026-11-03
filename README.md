@@ -29,7 +29,7 @@ Check with `strux_rs.cuda_is_available()`. Without a usable GPU it returns `Fals
 
 * **High-Throughput Ingestion & In-Flight Filtering**: Memory-mapped `.xtc`, `.dcd`, `.cif` (AF3/Boltz/RCSB), and `.pdb` readers with zero-copy atom-index and $C_\alpha$ subsetting during decompression (**73.6×** faster than MDAnalysis, **1.4×** faster than MDTraj).
 * **De Novo Protein & Therapeutic Design Biophysics**: Target-anchored Pose RMSD & monomer scRMSD (**10,000 complexes in 4.28 ms**, **374×** vs a NumPy SVD loop, 16-thread i9 laptop), interface geometry (buried polars heuristic, polar contacts, salt bridges), 96-point Shrake-Rupley BSA (**1.39 ms** for 2,048 atoms), screened Debye-Hückel $\Delta\Delta G_{\text{pH}}$, ANM normal modes, and developability screening (100k sequences in 69 ms).
-* **AI-Accelerated Simulation (AMS)**: AlphaFold lDDT (**201×** faster than NumPy), greedy sequence identity clustering (AF-Cluster style) (**33.8×** faster), Cartesian PCA (**5.1×** faster), and Markov state transition populations at **103.9M frames/s**.
+* **AI-Accelerated Simulation (AMS)**: lDDT (**201×** faster than NumPy), greedy sequence identity clustering (AF-Cluster style) (**33.8×** faster), Cartesian PCA (**5.1×** faster), and Markov state transition populations at **103.9M frames/s**.
 * **CUDA GPU Acceleration**: Pairwise RMSD at **2.05M alignments/s** (**4,348×** over Biopython, **25.3×** over Google JAX), Daura conformational clustering, and dense contact frequency matrices (**19.5×** speedup).
 
 ---
@@ -119,13 +119,13 @@ Head-to-head comparison across standard computational biology packages on identi
 | | MDTraj | 2.24 ms | 8,912.2 fps | 26.5× |
 | | **`strux-rs` (SIMD)** | **0.29 ms** | **68,770.8 fps** | **204×** |
 
-![Gold-Standard Ecosystem Benchmark](benchmarks/gold_standard_comparison.png?v=0.5.1)
+![Gold-Standard Ecosystem Benchmark](benchmarks/gold_standard_comparison.png?v=0.5.1b)
 
 ### 2. AMS Biophysics & Zero-Copy Acceleration
 
 | Kernel / Task | Workload | Reference Baseline | `strux-rs` | Speedup | Numerical Parity |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **AlphaFold lDDT** (`calculate_lddt`) | 4,000 atoms (16M pairs) | 943.42 ms (NumPy) | **4.69 ms** | **201.2×** | `0.00e+00` Δ (SO(3) invariant) |
+| **lDDT** (`calculate_lddt`) | 4,000 atoms (16M pairs) | 943.42 ms (NumPy) | **4.69 ms** | **201.2×** | `0.00e+00` Δ (SO(3) invariant) |
 | **Greedy MSA Cluster** (`cluster_msa`) | 10,000 seqs × 250 AA | 750.4 ms (Python) | **22.21 ms** | **33.8×** | Exact bit-for-bit cluster IDs |
 | **GROMACS `.xtc` Read** (`parse_xtc`) | 500 frames × 1,000 atoms | 39.04 ms (MDAnalysis) | **5.32 ms** | **7.3×** (2.8× vs MDTraj) | `1.53e-5 Å` max Δ vs C `xdrfile` |
 | **CHARMM `.dcd` Read** (`parse_dcd`) | 21 frames × 1,919 atoms | 27.97 ms (MDAnalysis) | **0.380 ms** | **73.6×** (1.4× vs MDTraj) | `0.00e+00 Å` exact match |
@@ -134,7 +134,7 @@ Head-to-head comparison across standard computational biology packages on identi
 | **MSA `uint8` Tensor** (`tokens_np`) | 1,024 seqs × 73 residues | 8.40 ms (Python) | **12.6 µs** | **664×** | Exact byte-for-byte match |
 | **GPU Contact Map** (`cuda_contact_frequency`) | 1,919 × 1,919 grid | 3,677.7 ms (NumPy) | **188.8 ms** | **19.5×** | `0.00e+00` exact parity |
 
-![New Features Verification](benchmarks/new_features_verification.png?v=0.5.1)
+![New Features Verification](benchmarks/new_features_verification.png?v=0.5.1b)
 
 <details>
 <summary><b>Extended Benchmarks: $O(T^2)$ Scaling, Cloud L4 GPU (24 GB) & 5-Minute Thermal Soak</b></summary>
@@ -147,7 +147,7 @@ Head-to-head comparison across standard computational biology packages on identi
 | 2,500 | 6,250,000 | 11.8s | 3.211s | 1,946,400 pairs/s | 3.7× |
 | 5,000 | 25,000,000 | 47.0s | 12.169s | **2,054,488 pairs/s** | **3.9×** |
 
-![Benchmark Scaling](benchmarks/benchmark_scaling.png?v=0.5.1)
+![Benchmark Scaling](benchmarks/benchmark_scaling.png?v=0.5.1b)
 
 #### B. Cross-Hardware Scaling: H100 (80 GB) vs. Cloud L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
 | Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | Data Center H100 (80 GB, 700W) | Max Throughput / Speedup |
@@ -157,11 +157,11 @@ Head-to-head comparison across standard computational biology packages on identi
 | **10,000 × 10,000 frames** (100.0M pairs) | 7,213.3 ms (7.21s) | 2,658.7 ms (2.66s) | **583.7 ms (0.58s)** | 42.83 B atom-pairs/s (171.3M align/s) |
 | **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM)* | 10,188.1 ms (10.19s) | **1,882.6 ms (1.88s)** | **53.12 B atom-pairs/s (212.5M align/s)** |
 | **5,000-Frame AMS Feedback Loop** | 10,618.3 ms | 7,938.1 ms | **4,821.7 ms** | Complete ensemble analysis in 4.82s |
-| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | 8.24 ms | **2.85 ms** | **348.2× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
+| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | 8.24 ms | **2.85 ms** | **348.2× vs NumPy SVD** (H100 host CPU) |
 | **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | 9.25 ms | **1.07 ms** | **109.3× vs pure Python** |
 | **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,362.3 ms | 7,461.3 ms | **5,628.9 ms** | **3,449.1× vs Python** (5.6s vs ~5.4 hours) |
 
-![Hardware Scaling Comparison](benchmarks/hardware_scaling_comparison.png?v=0.5.1)
+![Hardware Scaling Comparison](benchmarks/hardware_scaling_comparison.png?v=0.5.1b)
 
 #### C. Prolonged 5-Minute Full-System Hardware Burn (`309.3s` Concurrent 16T CPU + CUDA GPU)
 Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5%` mean utilization)** and **100% CUDA GPU saturation**:
@@ -173,7 +173,7 @@ Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5
   * **AF-Cluster `cluster_msa`**: `14,630,000` sequences clustered (`3.66 billion` residues)
   * **Markov State Steps**: `731,500,000` transitions solved
 
-![Hardware Soak Telemetry](benchmarks/hardware_soak_telemetry.png?v=0.5.1)
+![Hardware Soak Telemetry](benchmarks/hardware_soak_telemetry.png?v=0.5.1b)
 
 </details>
 

@@ -615,9 +615,10 @@ def main():
                 "benchmark": "full_ams_loop_5000frames_250atoms",
                 "strux_ms": round(t_ams_5k, 3),
                 "strux_iqr_ms": round(iqr_ams_5k, 3),
-                "baseline_ms": round(t_ams_5k * 45.0, 3),
-                "baseline_name": "PyEMMA_MDTraj_Estimated",
-                "speedup": 45.0,
+                # No baseline was run, so no speedup is reported (timing only).
+                "baseline_ms": None,
+                "baseline_name": None,
+                "speedup": None,
             })
             del traj_ams
 
@@ -699,10 +700,10 @@ def main():
             "benchmark": "af_cluster_a3m_5000x256",
             "strux_ms": round(t_strux_msa, 3),
             "strux_iqr_ms": round(iqr_msa, 3),
-            "baseline_ms": round(t_strux_msa * 38.0, 3),
-            "baseline_name": "Biopython_SeqIO_CDHIT_Estimate",
-            "speedup": 38.0,
-            "notes": "Estimated 38.0x speedup from published CD-HIT benchmarks, not direct local measurement",
+            # No baseline was run, so no speedup is reported (timing only).
+            "baseline_ms": None,
+            "baseline_name": None,
+            "speedup": None,
         })
 
         # Save outputs

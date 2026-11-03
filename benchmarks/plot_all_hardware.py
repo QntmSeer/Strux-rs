@@ -175,12 +175,16 @@ def main():
     # End labels
     end_label(ax1, pairs_full[-1], rate_h100[-1], f"CUDA H100 ({rate_h100[-1]:.1f}M/s)", dx=6, dy=1, color=JADE)
     end_label(ax1, pairs_full[-1], rate_l4[-1], f"CUDA L4 ({rate_l4[-1]:.1f}M/s)", dx=6, dy=1, color=RUST)
-    end_label(ax1, pairs_a2000[-1], rate_a2000[-1], f"A2000 ({rate_a2000[-1]:.1f}M/s)", dx=6, dy=-12, color=COBALT)
-    ax1.text(3.5e6, 5.0, f"8T Cloud CPU ({cpu_rate:.2f}M/s)", fontsize=6.5, color=INK2)
+    # A2000 label above its last point (left of it), OOM label above the x markers, CPU label bottom right
+    ax1.text(pairs_a2000[-1], rate_a2000[-1] + 7.0, f"A2000 ({rate_a2000[-1]:.1f}M/s)",
+             fontsize=6.6, color=COBALT, ha="right", va="bottom")
+    cpu_threads = l4_data["hardware"]["cpu_threads"]
+    ax1.text(8.5e5, 228.0, f"dotted line: L4 host CPU, {cpu_threads} threads ({cpu_rate:.2f}M/s)",
+             fontsize=6.3, color=INK2, ha="left", va="top")
 
     # OOM marker for A2000
     ax1.scatter([2.25e8, 4.0e8], [rate_a2000[-1], rate_a2000[-1]], marker="x", color=INK2, s=40, zorder=5, lw=1.2)
-    ax1.text(3.1e8, 17.5, "OOM (>4GB)", fontsize=6.2, color=INK2, ha="center")
+    ax1.text(3.0e8, rate_a2000[-1] + 7.0, "A2000 OOM (>4GB)", fontsize=6.2, color=INK2, ha="center", va="bottom")
 
     total_pairs = pairs_full[-1]
     time_max_h100 = time_h100_sec[-1]
@@ -188,7 +192,7 @@ def main():
     titles(
         ax1,
         f"H100 reaches {rate_h100[-1]:.1f}M alignments/s scaling to 400M pairs",
-        f"250-atom CA; H100 (80GB) vs L4 (24GB) vs RTX A2000 (4GB); 400M pairs in {time_max_h100:.2f}s ({atom_pairs_rate_h100:.1f}B at-pairs/s)",
+        f"250 atoms/frame, strux-rs {h100_data['strux_rs_version']}; H100 does 400M pairs in {time_max_h100:.2f}s ({atom_pairs_rate_h100:.1f}B atom-pairs/s)",
     )
 
     # =========================================================================
@@ -200,7 +204,6 @@ def main():
         ("Shrake BSA\n(2k at.)", "calculate_bsa_shrake_rupley_per_complex"),
         ("pH ddG\n(6.0/7.4)", "calculate_ph_switch_ddg"),
         ("DCD Filter\n(100x RAM)", "parse_dcd_solute_filtered_40k_to_400"),
-        ("AF-Cluster\n(est. 5k)", "af_cluster_a3m_5000x256"),
         ("Novelty DB\n(5k x 500)", "sliding_kmer_novelty_5000x500_k15"),
     ]
 
@@ -212,13 +215,13 @@ def main():
 
     ax2.axhline(1.0, color=REF, lw=0.9, ls=DASH)
     ax2.text(
-        xs[2] + 0.35,
-        1.25,
+        (xs[0] + xs[-1]) / 2,
+        0.82,
         "Python baseline parity (1.0x)",
         fontsize=6.3,
         color=INK2,
         ha="center",
-        bbox=dict(facecolor=PAPER, edgecolor="none", pad=1.0),
+        va="top",
     )
 
     all_measured_sp = []
@@ -226,7 +229,7 @@ def main():
         estimated = "est." in name
         sp_vals = []
         for j, (off, col, data) in enumerate(zip(offsets, colors, datasets)):
-            sp = data.get(bench_key, {}).get("speedup", 1.0)
+            sp = data[bench_key]["speedup"]  # fail loudly if a benchmark is missing
             sp_vals.append(sp)
             if not estimated:
                 all_measured_sp.append(sp)
@@ -254,7 +257,7 @@ def main():
     ax2.set_xticks(xs)
     ax2.set_xticklabels([k[0] for k in keys], fontsize=6.8)
     ax2.set_xlim(xs[0] - 0.7, xs[-1] + 0.7)
-    ax2.set_ylim(0.4, 9500.0)
+    ax2.set_ylim(0.4, 6.0e4)  # headroom above the tallest label for the legend
     ax2.set_xlabel("strux-rs biophysics & design primitive")
     ax2.set_ylabel("speedup over standard Python stack")
 
@@ -264,32 +267,22 @@ def main():
         mpl.lines.Line2D([0], [0], marker="o", color="w", markerfacecolor=RUST, markeredgecolor=PAPER, markersize=5, label="NVIDIA L4 (Cloud)"),
         mpl.lines.Line2D([0], [0], marker="D", color="w", markerfacecolor=JADE, markeredgecolor=PAPER, markersize=5, label="NVIDIA H100 (SXM)"),
     ]
-    ax2.legend(handles=legend_handles, loc="upper right", frameon=False, fontsize=6.4, handletextpad=0.3)
+    ax2.legend(handles=legend_handles, loc="upper center", ncol=3, frameon=False, fontsize=6.4,
+               handletextpad=0.3, columnspacing=1.2)
 
     min_sp, max_sp = min(all_measured_sp), max(all_measured_sp)
     titles(
         ax2,
         f"Zero-C primitives accelerate pipelines {min_sp:.0f}x to {max_sp:,.0f}x",
-        f"strux-rs 0.5.1 suite across Laptop, Cloud, & Data Center; hollow = estimated baseline",
+        f"strux-rs {h100_data['strux_rs_version']}; each speedup measured vs Python on that machine's CPU",
     )
 
     fig.tight_layout(w_pad=3.8)
 
-    # Save to both target filenames
     out_all = bdir / "hardware_scaling_comparison.png"
-    out_l4 = bdir / "hardware_l4_scaling_comparison.png"
-    out_artifact = Path(r"C:\Users\Gebruiker\.gemini\antigravity\brain\533f8aaa-3288-419b-a6a1-a41762761b7f\hardware_scaling_comparison.png")
-    out_artifact_l4 = Path(r"C:\Users\Gebruiker\.gemini\antigravity\brain\533f8aaa-3288-419b-a6a1-a41762761b7f\hardware_l4_scaling_comparison.png")
-
     fig.savefig(out_all, bbox_inches="tight", dpi=240)
-    fig.savefig(out_l4, bbox_inches="tight", dpi=240)
-    try:
-        fig.savefig(out_artifact, bbox_inches="tight", dpi=240)
-        fig.savefig(out_artifact_l4, bbox_inches="tight", dpi=240)
-    except Exception:
-        pass
     plt.close(fig)
-    print("Generated hardware_scaling_comparison.png and updated hardware_l4_scaling_comparison.png.")
+    print(f"wrote {out_all}")
 
 
 if __name__ == "__main__":
