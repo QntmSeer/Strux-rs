@@ -1,7 +1,8 @@
 {
-  "timestamp_utc": "2026-11-03T12:06:33Z",
-  "strux_rs_version": "0.5.1",
+  "timestamp_utc": "2026-11-03T17:35:37Z",
+  "strux_rs_version": "0.5.2",
   "strux_rs_file": "/home/agni/.venvs/strux-bench/lib/python3.12/site-packages/strux_rs/__init__.py",
+  "git_commit": "a1a7902",
   "dataset_source": "Synthetic_Boltz2_MultiChain (50 .cif files, 290 res)",
   "hardware": {
     "hostname": "omarchy",
@@ -18,147 +19,146 @@
     {
       "suite": "Suite1_CIF_Triage",
       "benchmark": "parse_cif_full_1000_complexes",
-      "strux_ms": 561.982,
-      "strux_iqr_ms": 7.971,
-      "baseline_ms": 3558.822,
+      "strux_ms": 563.633,
+      "strux_iqr_ms": 20.904,
+      "baseline_ms": 3785.545,
       "baseline_name": "Python_MMCIF_Parser",
-      "speedup": 6.33
+      "speedup": 6.72
     },
     {
       "suite": "Suite1_CIF_Triage",
       "benchmark": "batch_pose_and_sc_rmsd_10000",
-      "strux_ms": 4.28,
-      "strux_iqr_ms": 0.16,
-      "baseline_ms": 1602.435,
+      "strux_ms": 4.193,
+      "strux_iqr_ms": 0.094,
+      "baseline_ms": 1659.473,
       "baseline_name": "NumPy_SVD_Superimposer",
-      "speedup": 374.44
+      "speedup": 395.8
     },
     {
       "suite": "Suite1_CIF_Triage",
       "benchmark": "analyze_interface_physics_1000_complexes",
-      "strux_ms": 1672.898,
-      "strux_iqr_ms": 7.107,
-      "baseline_ms": 20908.589,
+      "strux_ms": 1654.651,
+      "strux_iqr_ms": 54.872,
+      "baseline_ms": 20761.834,
       "baseline_name": "Python_NumPy_Interface_Screener",
-      "speedup": 12.5
+      "speedup": 12.55
     },
     {
       "suite": "Suite1_CIF_Triage",
       "benchmark": "calculate_bsa_shrake_rupley_per_complex",
-      "strux_ms": 1.387,
-      "strux_iqr_ms": 0.006,
-      "baseline_ms": 140.745,
+      "strux_ms": 1.392,
+      "strux_iqr_ms": 0.419,
+      "baseline_ms": 142.374,
       "baseline_name": "Python_ShrakeRupley_96pt",
-      "speedup": 101.49
+      "speedup": 102.25
     },
     {
       "suite": "Suite1_CIF_Triage",
       "benchmark": "calculate_ph_switch_ddg",
-      "strux_ms": 0.2343,
-      "strux_iqr_ms": 0.0134,
-      "baseline_ms": 17.0085,
+      "strux_ms": 0.2174,
+      "strux_iqr_ms": 0.003,
+      "baseline_ms": 22.9104,
       "baseline_name": "Python_DebyeHuckel_Screener",
-      "speedup": 72.6
+      "speedup": 105.39
     },
     {
       "suite": "Suite1_CIF_Triage",
       "benchmark": "anm_modes_hessian_eigensolver",
-      "strux_ms": 118.502,
-      "strux_iqr_ms": 9.893,
-      "baseline_ms": 109.558,
+      "strux_ms": 143.211,
+      "strux_iqr_ms": 18.186,
+      "baseline_ms": 114.689,
       "baseline_name": "Python_ANM_Hessian_eigh",
-      "speedup": 0.92
+      "speedup": 0.8
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "parse_xtc_solute_filtered_40k_to_400",
-      "strux_ms": 45.238,
-      "strux_iqr_ms": 2.775,
-      "baseline_ms": 62.522,
+      "strux_ms": 43.094,
+      "strux_iqr_ms": 0.183,
+      "baseline_ms": 61.126,
       "baseline_name": "Full_Solvated_XTC_Load",
-      "speedup": 1.38
+      "speedup": 1.42
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "parse_dcd_solute_filtered_40k_to_400",
-      "strux_ms": 1.923,
-      "strux_iqr_ms": 0.288,
-      "baseline_ms": 55.11,
+      "strux_ms": 3.912,
+      "strux_iqr_ms": 0.586,
+      "baseline_ms": 53.551,
       "baseline_name": "Full_Solvated_DCD_Load",
-      "speedup": 28.66
+      "speedup": 13.69
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "cuda_pairwise_rmsd_1000x1000_250atoms",
-      "strux_ms": 196.381,
-      "strux_iqr_ms": 17.11,
-      "baseline_ms": 302.581,
+      "strux_ms": 76.925,
+      "strux_iqr_ms": 17.528,
+      "baseline_ms": 305.431,
       "baseline_name": "Rayon_CPU_16T",
-      "speedup": 1.54
+      "speedup": 3.97
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "cuda_pairwise_rmsd_2500x2500_250atoms",
-      "strux_ms": 581.315,
-      "strux_iqr_ms": 5.167,
-      "baseline_ms": 1891.131,
+      "strux_ms": 449.422,
+      "strux_iqr_ms": 2.026,
+      "baseline_ms": 1908.945,
       "baseline_name": "Rayon_CPU_16T",
-      "speedup": 3.25
+      "speedup": 4.25
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "cuda_pairwise_rmsd_5000x5000_250atoms",
-      "strux_ms": 1908.632,
-      "strux_iqr_ms": 12.09,
-      "baseline_ms": 7564.524,
+      "strux_ms": 1796.358,
+      "strux_iqr_ms": 2.215,
+      "baseline_ms": 7635.778,
       "baseline_name": "Rayon_CPU_16T",
-      "speedup": 3.96
+      "speedup": 4.25
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "cuda_pairwise_rmsd_10000x10000_250atoms",
-      "strux_ms": 7213.348,
-      "strux_iqr_ms": 13.024,
-      "baseline_ms": 30258.097,
+      "strux_ms": 7070.026,
+      "strux_iqr_ms": 2.721,
+      "baseline_ms": 30543.113,
       "baseline_name": "Rayon_CPU_16T",
-      "speedup": 4.19
+      "speedup": 4.32
     },
     {
       "suite": "Suite2_Trajectory_GPU",
       "benchmark": "full_ams_loop_5000frames_250atoms",
-      "strux_ms": 10618.251,
-      "strux_iqr_ms": 374.527,
-      "baseline_ms": 477821.277,
-      "baseline_name": "PyEMMA_MDTraj_Estimated",
-      "speedup": 45.0
+      "strux_ms": 10336.26,
+      "strux_iqr_ms": 24.432,
+      "baseline_ms": null,
+      "baseline_name": null,
+      "speedup": null
     },
     {
       "suite": "Suite3_Sequence_MSA",
       "benchmark": "screen_sequences_biophysics_100000",
-      "strux_ms": 69.442,
-      "strux_iqr_ms": 0.927,
-      "baseline_ms": 1575.65,
+      "strux_ms": 68.858,
+      "strux_iqr_ms": 0.983,
+      "baseline_ms": 1727.763,
       "baseline_name": "Python_Biophysics_Screener",
-      "speedup": 22.69
+      "speedup": 25.09
     },
     {
       "suite": "Suite3_Sequence_MSA",
       "benchmark": "sliding_kmer_novelty_5000x500_k15",
-      "strux_ms": 9362.273,
-      "strux_iqr_ms": 40.45,
-      "baseline_ms": 21294399.714,
+      "strux_ms": 9369.827,
+      "strux_iqr_ms": 49.184,
+      "baseline_ms": 18179368.912,
       "baseline_name": "Python_Sliding_Kmer",
-      "speedup": 2274.49
+      "speedup": 1940.2
     },
     {
       "suite": "Suite3_Sequence_MSA",
       "benchmark": "af_cluster_a3m_5000x256",
-      "strux_ms": 7.755,
-      "strux_iqr_ms": 0.218,
-      "baseline_ms": 294.684,
-      "baseline_name": "Biopython_SeqIO_CDHIT_Estimate",
-      "speedup": 38.0,
-      "notes": "Estimated 38.0x speedup from published CD-HIT benchmarks, not direct local measurement"
+      "strux_ms": 6.634,
+      "strux_iqr_ms": 0.144,
+      "baseline_ms": null,
+      "baseline_name": null,
+      "speedup": null
     }
   ]
 }
