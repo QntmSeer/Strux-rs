@@ -27,7 +27,8 @@ def main():
         print(f"nvrtcCreateProgram error: {err}")
         return 1
 
-    opts = [b"--gpu-architecture=compute_75", b"--use_fast_math"]
+    # Same target and no fast-math, matching the nvcc path in build.rs.
+    opts = [b"--gpu-architecture=compute_75"]
     res = nvrtc.nvrtcCompileProgram(prog, len(opts), opts)
 
     err, log_size = nvrtc.nvrtcGetProgramLogSize(prog)
@@ -45,6 +46,8 @@ def main():
     err, ptx_size = nvrtc.nvrtcGetPTXSize(prog)
     ptx_buf = bytearray(ptx_size)
     err = nvrtc.nvrtcGetPTX(prog, ptx_buf)
+    # NVRTC returns a NUL-terminated buffer; an embedded NUL breaks cuModuleLoadData via CString.
+    ptx_buf = bytes(ptx_buf).rstrip(b"\0")
     with open(ptx_path, "wb") as f:
         f.write(ptx_buf)
 
