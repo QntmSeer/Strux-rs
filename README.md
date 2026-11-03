@@ -96,7 +96,7 @@ Notes:
 
 Benchmarked on Intel Core i9-11950H (16 hardware threads, 62 GB RAM) and NVIDIA RTX A2000 Laptop GPU (4 GB VRAM, 35W TGP).
 
-CUDA timings in Section 1 and Section A below were recorded during 0.4.x development. Starting in 0.5.0, the QCP kernel iterates Newton to convergence. On the RTX A2000 its pairwise RMSD agrees with float64 Kabsch to within 2e-5 Å on `trajectory.pdb` and 1e-6 Å on random 250-atom frames (the fixed 12-step kernel was off by up to 7.4e-2 Å there). Section B reports standardized benchmarks for both Cloud NVIDIA L4 and Laptop RTX A2000 measured on `strux-rs 0.5.1`.
+CUDA timings in Section 1 and Section A below were recorded during 0.4.x development. Starting in 0.5.0, the QCP kernel iterates Newton to convergence. On the RTX A2000 its pairwise RMSD agrees with float64 Kabsch to within 2e-5 Å on `trajectory.pdb` and 1e-6 Å on random 250-atom frames (the fixed 12-step kernel was off by up to 7.4e-2 Å there). Section B reports standardized benchmarks for Data Center NVIDIA H100, Cloud NVIDIA L4, and Laptop RTX A2000 measured on `strux-rs 0.5.1`.
 
 Reproducibility: `scripts/run_gold_standard_benchmark.py` reads `benchmarks/data/2K39.pdb` (download from the RCSB PDB), `benchmarks/data/hmm_output.sto` and `benchmarks/data/bfd_uniclust_hits.a3m`. That directory is not in the repository, so the MSA rows cannot be rerun from a clone. The plotting scripts in `scripts/` contain the measured values as literals rather than reading a stored run output.
 
@@ -149,19 +149,19 @@ Head-to-head comparison across standard computational biology packages on identi
 
 ![Benchmark Scaling](benchmarks/benchmark_scaling.png?v=0.5.1)
 
-#### B. Cloud NVIDIA L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
-| Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | L4 Throughput / Speedup |
-| :--- | :---: | :---: | :---: |
-| **1,000 × 1,000 frames** (1.0M pairs) | 196.4 ms | **167.2 ms** | 1.50 B atom-pairs/s (4.08× vs 8T CPU) |
-| **5,000 × 5,000 frames** (25.0M pairs) | 1,908.6 ms | **775.1 ms** | 8.06 B atom-pairs/s (22.01× vs 8T CPU) |
-| **10,000 × 10,000 frames** (100.0M pairs) | 7,213.3 ms (7.21s) | **2,658.7 ms** | 9.40 B atom-pairs/s (25.67× vs 8T CPU) |
-| **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM barrier)* | **10,188.1 ms (10.19s)** | **9.82 B atom-pairs/s (26.80× vs 8T CPU)** |
-| **5,000-Frame AMS Feedback Loop** (lDDT + PCA + Daura + MSM) | 10,618.3 ms | **7,938.1 ms** | Complete ensemble analysis in 7.94s |
-| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | **8.24 ms** | **296.8× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
-| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | **9.25 ms** | **85.6× vs pure Python** |
-| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,362.3 ms | **7,461.3 ms** | **1,799.4× vs Python** (7.46s vs ~3.7 hours) |
+#### B. Cross-Hardware Scaling: H100 (80 GB) vs. Cloud L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
+| Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | Data Center H100 (80 GB, 700W) | Max Throughput / Speedup |
+| :--- | :---: | :---: | :---: | :---: |
+| **1,000 × 1,000 frames** (1.0M pairs) | 196.4 ms | 167.2 ms | **150.3 ms** | 1.66 B atom-pairs/s |
+| **5,000 × 5,000 frames** (25.0M pairs) | 1,908.6 ms | 775.1 ms | **258.1 ms** | 24.22 B atom-pairs/s |
+| **10,000 × 10,000 frames** (100.0M pairs) | 7,213.3 ms (7.21s) | 2,658.7 ms (2.66s) | **583.7 ms (0.58s)** | 42.83 B atom-pairs/s (171.3M align/s) |
+| **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM)* | 10,188.1 ms (10.19s) | **1,882.6 ms (1.88s)** | **53.12 B atom-pairs/s (212.5M align/s)** |
+| **5,000-Frame AMS Feedback Loop** | 10,618.3 ms | 7,938.1 ms | **4,821.7 ms** | Complete ensemble analysis in 4.82s |
+| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | 8.24 ms | **2.85 ms** | **348.2× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
+| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | 9.25 ms | **1.07 ms** | **109.3× vs pure Python** |
+| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,362.3 ms | 7,461.3 ms | **5,628.9 ms** | **3,449.1× vs Python** (5.6s vs ~5.4 hours) |
 
-![Hardware L4 Scaling Comparison](benchmarks/hardware_l4_scaling_comparison.png?v=0.5.1)
+![Hardware Scaling Comparison](benchmarks/hardware_scaling_comparison.png?v=0.5.1)
 
 #### C. Prolonged 5-Minute Full-System Hardware Burn (`309.3s` Concurrent 16T CPU + CUDA GPU)
 Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5%` mean utilization)** and **100% CUDA GPU saturation**:
