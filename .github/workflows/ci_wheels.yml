@@ -8,15 +8,39 @@ on:
   workflow_dispatch:
 
 jobs:
-  linux:
+  ptx:
+    # Compile the CUDA kernel to PTX with NVRTC (no GPU or nvcc needed). NVRTC 12.5 emits
+    # PTX ISA 8.5, matching cudarc's cuda-12050 bindings (driver supporting CUDA 12.5+).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile qcp.cu to PTX
+        run: |
+          pip install "cuda-python>=12.9,<13" "nvidia-cuda-nvrtc-cu12==12.5.*"
+          python compile_ptx.py
+          grep -c "^.visible .entry" src/cuda/kernels/qcp.ptx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcp-ptx
+          path: src/cuda/kernels/qcp.ptx
+
+  linux:
+    needs: ptx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: qcp-ptx
+          path: src/cuda/kernels
       - name: Build manylinux wheels
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --out dist
+          args: --release --features cuda --out dist
           manylinux: auto
       - uses: actions/upload-artifact@v4
         with:
@@ -41,14 +65,19 @@ jobs:
           path: dist
 
   windows:
+    needs: ptx
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: qcp-ptx
+          path: src/cuda/kernels
       - name: Build Windows x64 wheels
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --out dist
+          args: --release --features cuda --out dist
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-x64

@@ -46,5 +46,5 @@ benchmarks/retro_vibrant*
 benchmarks/standard*
 benchmarks/openfold_vs_strux*
 
-
-
+# Generated in CI by compile_ptx.py (and locally by build.rs when nvcc is present)
+src/cuda/kernels/qcp.ptx
