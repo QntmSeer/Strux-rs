@@ -442,6 +442,7 @@ name = "strux-rs"
 version = "0.5.0"
 dependencies = [
  "cudarc",
+ "libloading",
  "memmap2",
  "nalgebra",
  "numpy",

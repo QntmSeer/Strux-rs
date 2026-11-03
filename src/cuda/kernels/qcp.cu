@@ -162,15 +162,19 @@ __global__ void pairwise_qcp_tiled_kernel(
     double Gq = (double)norms[j];
     double lambda = 0.5 * (Gp + Gq);
 
-    // 5. Newton-Raphson iterations (monotonically converges to lambda_max)
-    #pragma unroll
-    for (int iter = 0; iter < 12; ++iter) {
+    // 5. Newton-Raphson iterations (monotonically converges to lambda_max from above).
+    // Iterate to convergence as in Theobald's reference QCP (evalprec 1e-11, <= 50 iterations).
+    // Protein-like pairs converge in ~5 steps; near-degenerate top eigenvalues (e.g. unrelated
+    // or nearly isotropic structures) converge only linearly and need ~20. A fixed 12 steps left
+    // lambda too high there and under-reported RMSD by up to ~0.07 A.
+    for (int iter = 0; iter < 50; ++iter) {
         double l2 = lambda * lambda;
         double f = l2 * l2 - 2.0 * c2 * l2 - 8.0 * c1 * lambda + c0;
         double f_prime = 4.0 * (l2 * lambda - c2 * lambda - 2.0 * c1);
-        if (fabs(f_prime) > 1e-12) {
-            lambda -= f / f_prime;
-        }
+        if (fabs(f_prime) <= 1e-300) break;
+        double step = f / f_prime;
+        lambda -= step;
+        if (fabs(step) <= 1e-11 * fabs(lambda)) break;
     }
 
     // 6. RMSD with floating-point underflow clamp (already normalized by 1/sqrt(num_atoms))

@@ -16,7 +16,12 @@ Fast, zero-C-dependency Rust + CUDA engine with Python bindings (`PyO3` / `NumPy
 pip install strux-rs
 ```
 
-Prebuilt wheels (Python 3.8+) are CPU-only. The CUDA functions (`cuda_pairwise_rmsd`, `cuda_cluster_daura`, `cuda_contact_frequency`) need a source build with `--features cuda`; see [Build from Source](#build-from-source).
+Prebuilt wheels cover Python 3.8+ on Linux x86_64, Windows x64 and macOS arm64. On Linux and Windows they include the CUDA functions (`cuda_pairwise_rmsd`, `cuda_cluster_daura`, `cuda_contact_map_bitmask`, `cuda_contact_frequency`). No CUDA toolkit is needed, only:
+
+* an NVIDIA GPU with compute capability 7.5 or newer (Turing and later: RTX 20xx, T4, A100, L4, H100), and
+* an NVIDIA driver that supports CUDA 12.5 or newer, with `libcuda.so` (Linux) or `nvcuda.dll` (Windows) on the library path.
+
+Check with `strux_rs.cuda_is_available()`. Without a usable GPU it returns `False`, the `cuda_*` functions raise `RuntimeError`, and all CPU functions work as normal. macOS wheels are CPU-only.
 
 ---
 
@@ -83,13 +88,15 @@ Notes:
 * **BSA radii.** Without `target_radii` / `binder_radii`, every atom gets a 1.70 Å radius, which overestimates BSA (row above). Pass element van der Waals radii for FreeSASA-comparable values.
 * **Interface terms are distance heuristics.** `analyze_interface_physics` counts polar contacts (cross-chain N/O within 3.5 Å, no angle or donor/acceptor check), salt bridges, and buried polar atoms without a nearby N/O partner. This is not Rosetta `BuriedUnsatHbonds`, and it has not been compared against Rosetta.
 * **lDDT (changed in 0.5.0).** The global score now pools all scored distance pairs, as in AlphaFold `lddt(per_residue=False)` and OpenStructure. Up to 0.4.x it averaged per-residue scores, which differed by up to 0.03 on this trajectory. Per-residue scores are unchanged. No stereochemistry checks are applied.
-* **Not covered here:** the CUDA kernels (no GPU in the test environment), MSA parsing and clustering, PCA, ANM, pH ΔΔG and sequence screening.
+* **Not covered here:** the CUDA kernels (no GPU in the test environment; `cuda_is_available()` returning `False` without a GPU is tested), MSA parsing and clustering, PCA, ANM, pH ΔΔG and sequence screening.
 
 ---
 
 ## Benchmarks
 
 Benchmarked on Intel Core i9-11950H (16 hardware threads, 62 GB RAM) and NVIDIA RTX A2000 Laptop GPU (4 GB VRAM, 35W TGP).
+
+CUDA timings below were measured before 0.5.0, when the QCP kernel ran a fixed 12 Newton steps. That under-reported RMSD by up to ~0.07 Å for near-degenerate pairs (e.g. uniform random coordinates); the kernel now iterates to convergence. On the RTX A2000, a 10,000 × 10,000 pairwise run on random 250-atom frames went from 6.97 s to 7.28 s with the fix, and its maximum error against float64 Kabsch fell from 7.4e-2 Å to 6.9e-7 Å.
 
 Reproducibility: `scripts/run_gold_standard_benchmark.py` reads `benchmarks/data/2K39.pdb` (download from the RCSB PDB), `benchmarks/data/hmm_output.sto` and `benchmarks/data/bfd_uniclust_hits.a3m`. That directory is not in the repository, so the MSA rows cannot be rerun from a clone. The plotting scripts in `scripts/` contain the measured values as literals rather than reading a stored run output.
 
@@ -174,11 +181,13 @@ Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5
 
 ## Build from Source
 
-Requires CUDA Toolkit ($\ge 12.0$) and Rust ($\ge 1.75$):
+Requires Rust ($\ge 1.75$). For the CUDA build, `build.rs` compiles `src/cuda/kernels/qcp.cu` with `nvcc` if it is on the path; otherwise generate the PTX first with NVRTC (no GPU needed), as CI does:
 ```bash
 git clone https://github.com/QntmSeer/strux-rs.git
 cd strux-rs
 pip install maturin
+# only needed without nvcc:
+pip install "cuda-python>=12.9,<13" "nvidia-cuda-nvrtc-cu12==12.5.*" && python compile_ptx.py
 maturin develop --release --features cuda
 ```
 

@@ -452,11 +452,44 @@ fn parse_stockholm_file(py: Python<'_>, path: &str) -> PyResult<Msa> {
     }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))
 }
 
+#[cfg(feature = "cuda")]
+const CUDA_REQUIREMENTS: &str =
+    "strux-rs GPU functions need an NVIDIA GPU (compute capability 7.5 or newer) and a driver supporting CUDA 12";
+
+/// True if the NVIDIA driver library can be opened under the names cudarc searches for.
+#[cfg(feature = "cuda")]
+fn cuda_driver_loadable() -> bool {
+    ["cuda", "nvcuda"]
+        .iter()
+        .any(|name| unsafe { libloading::Library::new(libloading::library_filename(name)) }.is_ok())
+}
+
+/// Create the GPU engine, turning a missing or unusable driver into a Python RuntimeError.
+/// cudarc panics when the driver library is absent or lacks CUDA 12 symbols, so the driver is
+/// probed first (the common no-GPU case, silent) and any remaining panic is caught.
+#[cfg(feature = "cuda")]
+fn new_gpu_engine(device_id: usize) -> PyResult<cuda::GpuTrajectoryEngine> {
+    if !cuda_driver_loadable() {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "NVIDIA driver library (libcuda.so / nvcuda.dll) not found. {CUDA_REQUIREMENTS}."
+        )));
+    }
+    match std::panic::catch_unwind(|| cuda::GpuTrajectoryEngine::new(device_id)) {
+        Ok(Ok(engine)) => Ok(engine),
+        Ok(Err(e)) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "CUDA init error: {e:?}. {CUDA_REQUIREMENTS}."
+        ))),
+        Err(_) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "The NVIDIA driver could not be loaded (it may be older than CUDA 12). {CUDA_REQUIREMENTS}."
+        ))),
+    }
+}
+
 #[pyfunction]
 fn cuda_is_available() -> bool {
     #[cfg(feature = "cuda")]
     {
-        cuda::GpuTrajectoryEngine::new(0).is_ok()
+        new_gpu_engine(0).is_ok()
     }
     #[cfg(not(feature = "cuda"))]
     {
@@ -479,8 +512,7 @@ fn cuda_pairwise_rmsd(
         pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
     })?;
 
-    let engine = cuda::GpuTrajectoryEngine::new(0)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+    let engine = new_gpu_engine(0)?;
 
     let dist = py.allow_threads(|| {
         engine.pairwise_rmsd(slice, num_frames, num_atoms)
@@ -513,8 +545,7 @@ fn cuda_cluster_daura(
         pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
     })?;
 
-    let engine = cuda::GpuTrajectoryEngine::new(0)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+    let engine = new_gpu_engine(0)?;
 
     let (labels, centroids) = py.allow_threads(|| {
         engine.cluster_daura(slice, num_frames, num_atoms, cutoff)
@@ -542,8 +573,7 @@ fn cuda_contact_map_bitmask(
         pyo3::exceptions::PyValueError::new_err("Trajectory array must be contiguous C-order")
     })?;
 
-    let engine = cuda::GpuTrajectoryEngine::new(0)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+    let engine = new_gpu_engine(0)?;
 
     let bitmasks = py.allow_threads(|| {
         engine.contact_map_bitmask(slice, num_frames, num_res, cutoff)
@@ -579,8 +609,7 @@ fn cuda_contact_frequency(
         pyo3::exceptions::PyValueError::new_err(format!("Coordinate array must be contiguous: {:?}", e))
     })?;
 
-    let engine = cuda::GpuTrajectoryEngine::new(device_id)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("CUDA init error: {:?}", e)))?;
+    let engine = new_gpu_engine(device_id)?;
 
     let freqs = py.allow_threads(|| {
         engine.contact_frequency(slice, num_frames, num_res, cutoff)
