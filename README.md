@@ -28,7 +28,7 @@ Check with `strux_rs.cuda_is_available()`. Without a usable GPU it returns `Fals
 ## Highlights
 
 * **High-Throughput Ingestion & In-Flight Filtering**: Memory-mapped `.xtc`, `.dcd`, `.cif` (AF3/Boltz/RCSB), and `.pdb` readers with zero-copy atom-index and $C_\alpha$ subsetting during decompression (**73.6×** faster than MDAnalysis, **1.4×** faster than MDTraj).
-* **De Novo Protein & Therapeutic Design Biophysics**: Target-anchored Pose RMSD & monomer scRMSD (**10,000 complexes in 4.03 ms**, **326×** vs NumPy SVD), interface geometry (buried polars heuristic, polar contacts, salt bridges), 96-point Shrake-Rupley BSA (**1.96 ms** for 2,048 atoms), screened Debye-Hückel $\Delta\Delta G_{\text{pH}}$, ANM normal modes, and developability screening (100k sequences in 270 ms).
+* **De Novo Protein & Therapeutic Design Biophysics**: Target-anchored Pose RMSD & monomer scRMSD (**10,000 complexes in 4.28 ms**, **374×** vs a NumPy SVD loop, 16-thread i9 laptop), interface geometry (buried polars heuristic, polar contacts, salt bridges), 96-point Shrake-Rupley BSA (**1.39 ms** for 2,048 atoms), screened Debye-Hückel $\Delta\Delta G_{\text{pH}}$, ANM normal modes, and developability screening (100k sequences in 69 ms).
 * **AI-Accelerated Simulation (AMS)**: AlphaFold lDDT (**201×** faster than NumPy), greedy sequence identity clustering (AF-Cluster style) (**33.8×** faster), Cartesian PCA (**5.1×** faster), and Markov state transition populations at **103.9M frames/s**.
 * **CUDA GPU Acceleration**: Pairwise RMSD at **2.05M alignments/s** (**4,348×** over Biopython, **25.3×** over Google JAX), Daura conformational clustering, and dense contact frequency matrices (**19.5×** speedup).
 
@@ -96,7 +96,7 @@ Notes:
 
 Benchmarked on Intel Core i9-11950H (16 hardware threads, 62 GB RAM) and NVIDIA RTX A2000 Laptop GPU (4 GB VRAM, 35W TGP).
 
-CUDA timings in Section 1 and Section A below were recorded during 0.4.x development. Starting in 0.5.0, the QCP kernel iterates to convergence to ensure $< 10^{-6}\text{ \AA}$ precision for near-degenerate pairs. Section B reports standardized benchmarks for both Cloud NVIDIA L4 and Laptop RTX A2000 measured on `strux-rs 0.5.1`.
+CUDA timings in Section 1 and Section A below were recorded during 0.4.x development. Starting in 0.5.0, the QCP kernel iterates Newton to convergence. On the RTX A2000 its pairwise RMSD agrees with float64 Kabsch to within 2e-5 Å on `trajectory.pdb` and 1e-6 Å on random 250-atom frames (the fixed 12-step kernel was off by up to 7.4e-2 Å there). Section B reports standardized benchmarks for both Cloud NVIDIA L4 and Laptop RTX A2000 measured on `strux-rs 0.5.1`.
 
 Reproducibility: `scripts/run_gold_standard_benchmark.py` reads `benchmarks/data/2K39.pdb` (download from the RCSB PDB), `benchmarks/data/hmm_output.sto` and `benchmarks/data/bfd_uniclust_hits.a3m`. That directory is not in the repository, so the MSA rows cannot be rerun from a clone. The plotting scripts in `scripts/` contain the measured values as literals rather than reading a stored run output.
 

@@ -124,9 +124,7 @@ def main():
         sp_af = l4_b["af_cluster_a3m_5000x256"]["speedup"]
         sp_nov = l4_b["sliding_kmer_novelty_5000x500_k15"]["speedup"]
     else:
-        time_l4_sec = np.array([164.41, 279.72, 790.17, 2720.59, 5943.28, 10447.47]) / 1000.0
-        cpu_rate = 1.46
-        sp_pose, sp_bsa, sp_ph, sp_dcd, sp_af, sp_nov = 327.6, 81.3, 53.1, 44.9, 38.0, 1792.0
+        raise SystemExit(f"missing {l4_json_path}: run benchmarks/run_standardized_l4_benchmarks.py on the L4 first")
 
     # Load A2000 run JSON
     a2000_json_path = Path(__file__).resolve().parent / "standardized_results_rtx_a2000_laptop_gpu.json"
@@ -141,7 +139,7 @@ def main():
             a2000_b["cuda_pairwise_rmsd_10000x10000_250atoms"]["strux_ms"],
         ]) / 1000.0
     else:
-        time_a2000_sec = np.array([211.4, 552.6, 1843.1, 6969.6]) / 1000.0
+        raise SystemExit(f"missing {a2000_json_path}: run benchmarks/run_standardized_l4_benchmarks.py on the A2000 first")
 
     rate_l4 = (pairs_l4 / 1e6) / time_l4_sec  # Million alignments / s
     rate_a2000 = (pairs_a2000 / 1e6) / time_a2000_sec
@@ -201,9 +199,13 @@ def main():
     )
 
     for i, (name, sp, col) in enumerate(benchmarks):
-        ax2.vlines(xs[i], 1.0, sp, color=col, lw=2.2)
-        ax2.plot(xs[i], sp, "o", color=col, ms=6.0, mec=PAPER, mew=0.8, zorder=4)
+        estimated = "est." in name
+        ax2.vlines(xs[i], 1.0, sp, color=col, lw=2.2, linestyles=DOT if estimated else "solid")
+        ax2.plot(xs[i], sp, "o", color=col, ms=6.0, mfc=PAPER if estimated else col,
+                 mec=col if estimated else PAPER, mew=1.2 if estimated else 0.8, zorder=4)
         label_text = f"{sp:.0f}x" if sp >= 100 else f"{sp:.1f}x"
+        if estimated:
+            label_text += " (est.)"
         ax2.text(xs[i], sp * 1.35, label_text, ha="center", va="bottom", fontsize=6.8, color=INK)
 
     ax2.set_yscale("log")
@@ -215,24 +217,18 @@ def main():
     ax2.set_xlabel("strux-rs biophysics & design primitive")
     ax2.set_ylabel("speedup over standard Python stack")
 
-    min_sp = min(b[1] for b in benchmarks)
-    max_sp = max(b[1] for b in benchmarks)
+    measured = [b[1] for b in benchmarks if "est." not in b[0]]
+    min_sp, max_sp = min(measured), max(measured)
     titles(
         ax2,
         f"Zero-C primitives accelerate pipelines {min_sp:.0f}x to {max_sp:,.0f}x",
-        "NVIDIA L4 node; identical analytical outputs (max coord drift < 1.6e-6 A)",
+        f"NVIDIA L4, strux-rs {l4_data['strux_rs_version']}; hollow marker = estimated baseline, not measured",
     )
 
     fig.tight_layout(w_pad=3.8)
 
-    out_benchmarks = "benchmarks/hardware_l4_scaling_comparison.png"
-    out_artifact = r"C:\Users\Gebruiker\.gemini\antigravity\brain\533f8aaa-3288-419b-a6a1-a41762761b7f\hardware_l4_scaling_comparison.png"
-
+    out_benchmarks = Path(__file__).resolve().parent / "hardware_l4_scaling_comparison.png"
     fig.savefig(out_benchmarks, bbox_inches="tight", dpi=220)
-    try:
-        fig.savefig(out_artifact, bbox_inches="tight", dpi=220)
-    except Exception:
-        pass
     plt.close(fig)
     print("Regenerated hardware_l4_scaling_comparison.png matching benchmark_scaling.png exactly.")
 
