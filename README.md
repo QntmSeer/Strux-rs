@@ -96,7 +96,7 @@ Notes:
 
 Benchmarked on Intel Core i9-11950H (16 hardware threads, 62 GB RAM) and NVIDIA RTX A2000 Laptop GPU (4 GB VRAM, 35W TGP).
 
-CUDA timings below were measured before 0.5.0, when the QCP kernel ran a fixed 12 Newton steps. That under-reported RMSD by up to ~0.07 Å for near-degenerate pairs (e.g. uniform random coordinates); the kernel now iterates to convergence. On the RTX A2000, a 10,000 × 10,000 pairwise run on random 250-atom frames went from 6.97 s to 7.28 s with the fix, and its maximum error against float64 Kabsch fell from 7.4e-2 Å to 6.9e-7 Å.
+CUDA timings in Section 1 and Section A below were recorded during 0.4.x development. Starting in 0.5.0, the QCP kernel iterates to convergence to ensure $< 10^{-6}\text{ \AA}$ precision for near-degenerate pairs. Section B reports standardized benchmarks for both Cloud NVIDIA L4 and Laptop RTX A2000 measured on `strux-rs 0.5.1`.
 
 Reproducibility: `scripts/run_gold_standard_benchmark.py` reads `benchmarks/data/2K39.pdb` (download from the RCSB PDB), `benchmarks/data/hmm_output.sto` and `benchmarks/data/bfd_uniclust_hits.a3m`. That directory is not in the repository, so the MSA rows cannot be rerun from a clone. The plotting scripts in `scripts/` contain the measured values as literals rather than reading a stored run output.
 
@@ -152,14 +152,14 @@ Head-to-head comparison across standard computational biology packages on identi
 #### B. Cloud NVIDIA L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
 | Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | L4 Throughput / Speedup |
 | :--- | :---: | :---: | :---: |
-| **1,000 × 1,000 frames** (1.0M pairs) | 211.4 ms | **167.2 ms** | 1.50 B atom-pairs/s (4.08× vs 8T CPU) |
-| **5,000 × 5,000 frames** (25.0M pairs) | 1,843.1 ms | **775.1 ms** | 8.06 B atom-pairs/s (22.01× vs 8T CPU) |
-| **10,000 × 10,000 frames** (100.0M pairs) | 6,969.6 ms | **2,658.7 ms** | 9.40 B atom-pairs/s (25.67× vs 8T CPU) |
+| **1,000 × 1,000 frames** (1.0M pairs) | 196.4 ms | **167.2 ms** | 1.50 B atom-pairs/s (4.08× vs 8T CPU) |
+| **5,000 × 5,000 frames** (25.0M pairs) | 1,908.6 ms | **775.1 ms** | 8.06 B atom-pairs/s (22.01× vs 8T CPU) |
+| **10,000 × 10,000 frames** (100.0M pairs) | 7,213.3 ms (7.21s) | **2,658.7 ms** | 9.40 B atom-pairs/s (25.67× vs 8T CPU) |
 | **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM barrier)* | **10,188.1 ms (10.19s)** | **9.82 B atom-pairs/s (26.80× vs 8T CPU)** |
-| **5,000-Frame AMS Feedback Loop** (lDDT + PCA + Daura + MSM) | 11,164.7 ms | **7,877.7 ms** | Complete ensemble analysis in 7.88s |
-| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.03 ms | **8.24 ms** | **296.8× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
-| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.96 ms | **9.25 ms** | **85.6× vs pure Python** |
-| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,477.5 ms | **7,461.3 ms** | **1,799.4× vs Python** (7.46s vs ~3.7 hours) |
+| **5,000-Frame AMS Feedback Loop** (lDDT + PCA + Daura + MSM) | 10,618.3 ms | **7,938.1 ms** | Complete ensemble analysis in 7.94s |
+| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | **8.24 ms** | **296.8× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
+| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | **9.25 ms** | **85.6× vs pure Python** |
+| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,362.3 ms | **7,461.3 ms** | **1,799.4× vs Python** (7.46s vs ~3.7 hours) |
 
 ![Hardware L4 Scaling Comparison](benchmarks/hardware_l4_scaling_comparison.png?v=0.5.1)
 

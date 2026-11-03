@@ -215,9 +215,11 @@ def main():
     ax2.set_xlabel("strux-rs biophysics & design primitive")
     ax2.set_ylabel("speedup over standard Python stack")
 
+    min_sp = min(b[1] for b in benchmarks)
+    max_sp = max(b[1] for b in benchmarks)
     titles(
         ax2,
-        "Zero-C primitives accelerate pipelines 38x to 1,792x",
+        f"Zero-C primitives accelerate pipelines {min_sp:.0f}x to {max_sp:,.0f}x",
         "NVIDIA L4 node; identical analytical outputs (max coord drift < 1.6e-6 A)",
     )
 
