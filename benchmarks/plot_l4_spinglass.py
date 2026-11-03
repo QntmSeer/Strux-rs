@@ -96,7 +96,7 @@ def main():
     # =========================================================================
     frames_l4 = np.array([1000, 2500, 5000, 10000, 15000, 20000], dtype=float)
     pairs_l4 = frames_l4 ** 2
-    time_l4_sec = np.array([159.6, 221.9, 551.7, 1767.5, 3792.9, 6606.1]) / 1000.0
+    time_l4_sec = np.array([164.41, 279.72, 790.17, 2720.59, 5943.28, 10447.47]) / 1000.0
     rate_l4 = (pairs_l4 / 1e6) / time_l4_sec  # Million alignments / s
 
     frames_a2000 = np.array([1000, 2500, 5000, 10000], dtype=float)
@@ -106,7 +106,7 @@ def main():
 
     ax1.plot(pairs_l4, rate_l4, "-o", color=RUST, mec=PAPER, mew=0.7, lw=1.6, ms=5.0)
     ax1.plot(pairs_a2000, rate_a2000, "--s", color=COBALT, mec=PAPER, mew=0.7, lw=1.3, ms=4.5)
-    ax1.axhline(1.47, color=REF, lw=0.9, ls=DOT)
+    ax1.axhline(1.46, color=REF, lw=0.9, ls=DOT)
 
     ax1.set_xscale("log")
     plain_log_axis(ax1, "x")
@@ -116,9 +116,9 @@ def main():
     ax1.set_ylabel("million alignments / s")
 
     # Clean inline annotations matching benchmark_scaling.png
-    end_label(ax1, pairs_l4[-1], rate_l4[-1], "CUDA L4 (60.5M/s)", dx=6, dy=1)
+    end_label(ax1, pairs_l4[-1], rate_l4[-1], "CUDA L4 (38.3M/s)", dx=6, dy=1)
     end_label(ax1, pairs_a2000[-1], rate_a2000[-1], "A2000 (14.3M/s)", dx=6, dy=-12)
-    ax1.text(3.5e6, 3.2, "8T Cloud CPU (1.47M/s)", fontsize=6.5, color=INK2)
+    ax1.text(3.5e6, 3.2, "8T Cloud CPU (1.46M/s)", fontsize=6.5, color=INK2)
 
     # OOM marker
     ax1.scatter([2.25e8, 4.0e8], [14.34, 14.34], marker="x", color=INK2, s=40, zorder=5, lw=1.2)
@@ -126,8 +126,8 @@ def main():
 
     titles(
         ax1,
-        "L4 reaches 60.5M alignments/s scaling to 400M pairs",
-        "250-atom CA; L4 (24GB) vs RTX A2000 (4GB); 400M pairs in 6.60s (15.1B atom-pairs/s)",
+        "L4 reaches 38.3M alignments/s scaling to 400M pairs",
+        "250-atom CA; L4 (24GB) vs RTX A2000 (4GB); 400M pairs in 10.45s (9.57B atom-pairs/s)",
     )
 
     # =========================================================================
@@ -135,12 +135,12 @@ def main():
     # Vertical lollipop bars with crisp spacing and clean top speedup labels
     # =========================================================================
     benchmarks = [
-        ("Pose RMSD\n(10k)", 326.3, RUST),
-        ("Shrake BSA\n(2k at.)", 90.6, COBALT),
-        ("pH ddG\n(6.0/7.4)", 55.0, COBALT),
-        ("DCD Filter\n(100x RAM)", 43.6, JADE),
+        ("Pose RMSD\n(10k)", 327.6, RUST),
+        ("Shrake BSA\n(2k at.)", 81.3, COBALT),
+        ("pH ddG\n(6.0/7.4)", 53.1, COBALT),
+        ("DCD Filter\n(100x RAM)", 44.9, JADE),
         ("AF-Cluster\n(5k x 256)", 38.0, JADE),
-        ("Novelty DB\n(5k x 500)", 1793.8, RUST),
+        ("Novelty DB\n(5k x 500)", 1792.0, RUST),
     ]
     xs = np.arange(len(benchmarks)) * 1.35  # Wider horizontal stride to avoid x-tick collision
 
@@ -172,7 +172,7 @@ def main():
 
     titles(
         ax2,
-        "Zero-C primitives accelerate pipelines 38x to 1,794x",
+        "Zero-C primitives accelerate pipelines 38x to 1,792x",
         "NVIDIA L4 node; identical analytical outputs (max coord drift < 1.6e-6 A)",
     )
 
