@@ -111,6 +111,12 @@ def main():
     l4_data = json.loads(l4_path.read_text(encoding="utf-8"))
     a2000_data = json.loads(a2000_path.read_text(encoding="utf-8"))
 
+    def build_label(data):
+        """Version plus commit, since __version__ alone cannot distinguish a local build."""
+        ver = data.get("strux_rs_version", "unknown")
+        commit = data.get("git_commit")
+        return f"{ver} ({commit})" if commit and commit != "unknown" else ver
+
     h100_b = {b["benchmark"]: b for b in h100_data.get("benchmarks", [])}
     l4_b = {b["benchmark"]: b for b in l4_data.get("benchmarks", [])}
     a2000_b = {b["benchmark"]: b for b in a2000_data.get("benchmarks", [])}
@@ -168,31 +174,37 @@ def main():
     ax1.set_xscale("log")
     plain_log_axis(ax1, "x")
     ax1.set_xlim(7e5, 1.9e9)
-    ax1.set_ylim(-5.0, 245.0)
+    # Log y: the three tiers plus the CPU reference span 1.5 to ~590 M alignments/s,
+    # which a linear axis collapses onto the baseline.
+    ax1.set_yscale("log")
+    plain_log_axis(ax1, "y")
+    ax1.set_ylim(0.9, max(rate_h100.max(), rate_l4.max()) * 3.0)
     ax1.set_xlabel("pairwise alignments $T^2$ ($N=250$ atoms)")
     ax1.set_ylabel("million alignments / s")
 
-    # End labels
-    end_label(ax1, pairs_full[-1], rate_h100[-1], f"CUDA H100 ({rate_h100[-1]:.1f}M/s)", dx=6, dy=1, color=JADE)
+    # End labels, offset multiplicatively because the y axis is logarithmic
+    end_label(ax1, pairs_full[-1], rate_h100[-1], f"CUDA H100 ({rate_h100[-1]:.0f}M/s)", dx=6, dy=1, color=JADE)
     end_label(ax1, pairs_full[-1], rate_l4[-1], f"CUDA L4 ({rate_l4[-1]:.1f}M/s)", dx=6, dy=1, color=RUST)
-    # A2000 label above its last point (left of it), OOM label above the x markers, CPU label bottom right
-    ax1.text(pairs_a2000[-1], rate_a2000[-1] + 7.0, f"A2000 ({rate_a2000[-1]:.1f}M/s)",
+    ax1.text(pairs_a2000[-1] * 0.85, rate_a2000[-1] * 1.22, f"A2000 ({rate_a2000[-1]:.1f}M/s)",
              fontsize=6.6, color=COBALT, ha="right", va="bottom")
     cpu_threads = l4_data["hardware"]["cpu_threads"]
-    ax1.text(8.5e5, 228.0, f"dotted line: L4 host CPU, {cpu_threads} threads ({cpu_rate:.2f}M/s)",
-             fontsize=6.3, color=INK2, ha="left", va="top")
+    ax1.text(1.5e6, cpu_rate * 1.18, f"L4 host CPU, {cpu_threads} threads ({cpu_rate:.2f}M/s)",
+             fontsize=6.3, color=INK2, ha="left", va="bottom")
 
     # OOM marker for A2000
     ax1.scatter([2.25e8, 4.0e8], [rate_a2000[-1], rate_a2000[-1]], marker="x", color=INK2, s=40, zorder=5, lw=1.2)
-    ax1.text(3.0e8, rate_a2000[-1] + 7.0, "A2000 OOM (>4GB)", fontsize=6.2, color=INK2, ha="center", va="bottom")
+    ax1.text(3.0e8, rate_a2000[-1] * 1.22, "A2000 OOM (>4GB)", fontsize=6.2, color=INK2, ha="center", va="bottom")
 
     total_pairs = pairs_full[-1]
     time_max_h100 = time_h100_sec[-1]
     atom_pairs_rate_h100 = (total_pairs * 250) / time_max_h100 / 1e9
+    peak_h100 = rate_h100.max()
+    peak_frames = int(frames_full[int(rate_h100.argmax())])
     titles(
         ax1,
-        f"H100 reaches {rate_h100[-1]:.1f}M alignments/s scaling to 400M pairs",
-        f"250 atoms/frame, strux-rs {h100_data['strux_rs_version']}; H100 does 400M pairs in {time_max_h100:.2f}s ({atom_pairs_rate_h100:.1f}B atom-pairs/s)",
+        f"H100 peaks at {peak_h100:.0f}M alignments/s, {rate_h100[-1]:.0f}M at 400M pairs",
+        f"250 atoms/frame, strux-rs {build_label(h100_data)}; peak at {peak_frames:,} frames; "
+        f"400M pairs in {time_max_h100:.2f}s ({atom_pairs_rate_h100:.1f}B atom-pairs/s)",
     )
 
     # =========================================================================
@@ -274,7 +286,7 @@ def main():
     titles(
         ax2,
         f"Zero-C primitives accelerate pipelines {min_sp:.0f}x to {max_sp:,.0f}x",
-        f"strux-rs {h100_data['strux_rs_version']}; each speedup measured vs Python on that machine's CPU",
+        f"strux-rs {build_label(h100_data)}; each speedup measured vs Python on that machine's CPU",
     )
 
     fig.tight_layout(w_pad=3.8)

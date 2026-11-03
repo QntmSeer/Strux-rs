@@ -6,7 +6,7 @@
 
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)]()
 [![Python Bindings](https://img.shields.io/badge/Python-PyO3_/_Maturin-blue.svg)]()
-[![PyPI Package](https://img.shields.io/badge/PyPI-v0.5.1-blue.svg)](https://pypi.org/project/strux-rs/)
+[![PyPI Package](https://img.shields.io/badge/PyPI-v0.5.2-blue.svg)](https://pypi.org/project/strux-rs/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.x_QCP-76b900.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
@@ -152,16 +152,18 @@ Head-to-head comparison across standard computational biology packages on identi
 #### B. Cross-Hardware Scaling: H100 (80 GB) vs. Cloud L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
 | Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | Data Center H100 (80 GB, 700W) | Max Throughput / Speedup |
 | :--- | :---: | :---: | :---: | :---: |
-| **1,000 × 1,000 frames** (1.0M pairs) | 196.4 ms | 167.2 ms | **150.3 ms** | 1.66 B atom-pairs/s |
-| **5,000 × 5,000 frames** (25.0M pairs) | 1,908.6 ms | 775.1 ms | **258.1 ms** | 24.22 B atom-pairs/s |
-| **10,000 × 10,000 frames** (100.0M pairs) | 7,213.3 ms (7.21s) | 2,658.7 ms (2.66s) | **583.7 ms (0.58s)** | 42.83 B atom-pairs/s (171.3M align/s) |
-| **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM)* | 10,188.1 ms (10.19s) | **1,882.6 ms (1.88s)** | **53.12 B atom-pairs/s (212.5M align/s)** |
-| **5,000-Frame AMS Feedback Loop** | 10,618.3 ms | 7,938.1 ms | **4,821.7 ms** | Complete ensemble analysis in 4.82s |
-| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | 8.24 ms | **2.85 ms** | **348.2× vs NumPy SVD** (H100 host CPU) |
-| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | 9.25 ms | **1.07 ms** | **109.3× vs pure Python** |
-| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,362.3 ms | 7,461.3 ms | **5,628.9 ms** | **3,449.1× vs Python** (5.6s vs ~5.4 hours) |
+| **1,000 × 1,000 frames** (1.0M pairs) | 196.4 ms | 167.2 ms | **2.1 ms** | 117.9 B atom-pairs/s (471M align/s) |
+| **5,000 × 5,000 frames** (25.0M pairs) | 1,908.6 ms | 775.1 ms | **107.7 ms** | 58.0 B atom-pairs/s |
+| **10,000 × 10,000 frames** (100.0M pairs) | 7,213.3 ms (7.21s) | 2,658.7 ms (2.66s) | **428.7 ms (0.43s)** | 58.3 B atom-pairs/s (233M align/s) |
+| **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM)* | 10,188.1 ms (10.19s) | **1,704.3 ms (1.70s)** | **58.7 B atom-pairs/s (235M align/s)** |
+| **5,000-Frame AMS Feedback Loop** | 10,618.3 ms | 7,938.1 ms | **4,698.5 ms** | Complete ensemble analysis in 4.70s |
+| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.28 ms | 8.24 ms | **2.95 ms** | **357.9× vs NumPy SVD** (H100 host CPU) |
+| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | 9.25 ms | **1.14 ms** | **107.6× vs pure Python** |
+| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,362.3 ms | 7,461.3 ms | **5,809.1 ms** | **3,325.9× vs Python** (5.8s vs ~5.4 hours) |
 
-![Hardware Scaling Comparison](benchmarks/hardware_scaling_comparison.png?v=0.5.1b)
+The H100 column was measured after the CUDA engine became a process-wide singleton, which removes the ~150 ms driver context and PTX JIT cost that every `cuda_*` call previously paid. The L4 and RTX A2000 columns predate that change (released 0.5.1), so the small-matrix gap between the columns reflects that caching, not the hardware. Large-matrix rows are dominated by kernel and transfer time and are comparable. Engine caching ships in 0.5.2; the L4 and RTX A2000 columns will be re-measured on that release.
+
+![Hardware Scaling Comparison](benchmarks/hardware_scaling_comparison.png?v=0.5.2a)
 
 #### C. Prolonged 5-Minute Full-System Hardware Burn (`309.3s` Concurrent 16T CPU + CUDA GPU)
 Under 5+ continuous minutes of simultaneous **16-thread Rayon CPU torture (`97.5%` mean utilization)** and **100% CUDA GPU saturation**:

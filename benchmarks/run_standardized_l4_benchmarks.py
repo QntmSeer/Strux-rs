@@ -23,6 +23,25 @@ import numpy as np
 import strux_rs
 
 
+def _git_commit() -> str:
+    """Short commit of the repo this script lives in, or 'unknown' outside a checkout."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode != 0:
+            return "unknown"
+        commit = out.stdout.strip()
+        dirty = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return commit + ("-dirty" if dirty.stdout.strip() else "")
+    except Exception:
+        return "unknown"
+
+
 def get_hardware_provenance() -> dict:
     info = {
         "hostname": socket.gethostname(),
@@ -718,6 +737,9 @@ def main():
             "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "strux_rs_version": getattr(strux_rs, "__version__", "unknown"),
             "strux_rs_file": getattr(strux_rs, "__file__", "unknown"),
+            # __version__ comes from Cargo.toml, so a local build of unreleased code reports the
+            # same string as the published wheel. Record the commit so a run can be traced to a build.
+            "git_commit": _git_commit(),
             "dataset_source": dataset_source,
             "hardware": hw,
             "benchmarks": records,
