@@ -316,7 +316,8 @@ def create_synthetic_boltz_cif(path: Path, n_target_res: int = 180, n_binder_res
 def main():
     hw = get_hardware_provenance()
     print("=" * 88)
-    print(f"STRUX-RS v0.4.0 STANDARDIZED BENCHMARK SUITE — {hw['hostname'].upper()}")
+    v_str = getattr(strux_rs, "__version__", "unknown")
+    print(f"STRUX-RS v{v_str} STANDARDIZED BENCHMARK SUITE — {hw['hostname'].upper()}")
     print(f"CPU: {hw['cpu_model']} ({hw['cpu_threads']} threads) | GPU: {hw['gpu_name']} ({hw['gpu_vram_mib']} MiB, {hw['gpu_power_limit_w']}W)")
     print("=" * 88)
 
@@ -699,8 +700,9 @@ def main():
             "strux_ms": round(t_strux_msa, 3),
             "strux_iqr_ms": round(iqr_msa, 3),
             "baseline_ms": round(t_strux_msa * 38.0, 3),
-            "baseline_name": "Biopython_SeqIO_CDHIT_Est",
+            "baseline_name": "Biopython_SeqIO_CDHIT_Estimate",
             "speedup": 38.0,
+            "notes": "Estimated 38.0x speedup from published CD-HIT benchmarks, not direct local measurement",
         })
 
         # Save outputs
@@ -713,7 +715,8 @@ def main():
 
         payload = {
             "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "strux_rs_version": "0.4.0",
+            "strux_rs_version": getattr(strux_rs, "__version__", "unknown"),
+            "strux_rs_file": getattr(strux_rs, "__file__", "unknown"),
             "dataset_source": dataset_source,
             "hardware": hw,
             "benchmarks": records,
@@ -724,6 +727,7 @@ def main():
             writer = csv.DictWriter(
                 f,
                 fieldnames=["suite", "benchmark", "strux_ms", "strux_iqr_ms", "baseline_ms", "baseline_name", "speedup"],
+                extrasaction="ignore",
             )
             writer.writeheader()
             writer.writerows(records)

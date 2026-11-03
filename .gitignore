@@ -43,7 +43,10 @@ scripts/stress_test_new_features.sh
 scripts/verify_new_features.sh
 benchmarks/complete_ecosystem_comparison.png
 benchmarks/retro_vibrant*
-benchmarks/standard*
+benchmarks/standard_comparison.gp
+benchmarks/standard_ecosystem_comparison.png
+!benchmarks/standardized_results_*.json
+!benchmarks/standardized_results_*.csv
 benchmarks/openfold_vs_strux*
 
 # Generated in CI by compile_ptx.py (and locally by build.rs when nvcc is present)

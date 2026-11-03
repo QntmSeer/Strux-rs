@@ -93,20 +93,62 @@ def main():
 
     # =========================================================================
     # Panel 1: Trajectory Pairwise RMSD Throughput Scaling (L4 vs RTX A2000)
+    # Dynamically read from standardized_results_*.json run outputs
     # =========================================================================
     frames_l4 = np.array([1000, 2500, 5000, 10000, 15000, 20000], dtype=float)
     pairs_l4 = frames_l4 ** 2
-    time_l4_sec = np.array([164.41, 279.72, 790.17, 2720.59, 5943.28, 10447.47]) / 1000.0
-    rate_l4 = (pairs_l4 / 1e6) / time_l4_sec  # Million alignments / s
 
     frames_a2000 = np.array([1000, 2500, 5000, 10000], dtype=float)
     pairs_a2000 = frames_a2000 ** 2
-    time_a2000_sec = np.array([211.4, 552.6, 1843.1, 6969.6]) / 1000.0
+
+    # Load L4 run JSON
+    l4_json_path = Path(__file__).resolve().parent / "standardized_results_l4.json"
+    if l4_json_path.exists():
+        import json
+        l4_data = json.loads(l4_json_path.read_text(encoding="utf-8"))
+        l4_b = {b["benchmark"]: b for b in l4_data.get("benchmarks", [])}
+        time_l4_sec = np.array([
+            l4_b["cuda_pairwise_rmsd_1000x1000_250atoms"]["strux_ms"],
+            l4_b["cuda_pairwise_rmsd_2500x2500_250atoms"]["strux_ms"],
+            l4_b["cuda_pairwise_rmsd_5000x5000_250atoms"]["strux_ms"],
+            l4_b["cuda_pairwise_rmsd_10000x10000_250atoms"]["strux_ms"],
+            l4_b["cuda_pairwise_rmsd_15000x15000_250atoms"]["strux_ms"],
+            l4_b["cuda_pairwise_rmsd_20000x20000_250atoms"]["strux_ms"],
+        ]) / 1000.0
+        cpu_baseline_sec = l4_b["cuda_pairwise_rmsd_1000x1000_250atoms"]["baseline_ms"] / 1000.0
+        cpu_rate = 1.0 / cpu_baseline_sec
+        sp_pose = l4_b["batch_pose_and_sc_rmsd_10000"]["speedup"]
+        sp_bsa = l4_b["calculate_bsa_shrake_rupley_per_complex"]["speedup"]
+        sp_ph = l4_b["calculate_ph_switch_ddg"]["speedup"]
+        sp_dcd = l4_b["parse_dcd_solute_filtered_40k_to_400"]["speedup"]
+        sp_af = l4_b["af_cluster_a3m_5000x256"]["speedup"]
+        sp_nov = l4_b["sliding_kmer_novelty_5000x500_k15"]["speedup"]
+    else:
+        time_l4_sec = np.array([164.41, 279.72, 790.17, 2720.59, 5943.28, 10447.47]) / 1000.0
+        cpu_rate = 1.46
+        sp_pose, sp_bsa, sp_ph, sp_dcd, sp_af, sp_nov = 327.6, 81.3, 53.1, 44.9, 38.0, 1792.0
+
+    # Load A2000 run JSON
+    a2000_json_path = Path(__file__).resolve().parent / "standardized_results_rtx_a2000_laptop_gpu.json"
+    if a2000_json_path.exists():
+        import json
+        a2000_data = json.loads(a2000_json_path.read_text(encoding="utf-8"))
+        a2000_b = {b["benchmark"]: b for b in a2000_data.get("benchmarks", [])}
+        time_a2000_sec = np.array([
+            a2000_b["cuda_pairwise_rmsd_1000x1000_250atoms"]["strux_ms"],
+            a2000_b["cuda_pairwise_rmsd_2500x2500_250atoms"]["strux_ms"],
+            a2000_b["cuda_pairwise_rmsd_5000x5000_250atoms"]["strux_ms"],
+            a2000_b["cuda_pairwise_rmsd_10000x10000_250atoms"]["strux_ms"],
+        ]) / 1000.0
+    else:
+        time_a2000_sec = np.array([211.4, 552.6, 1843.1, 6969.6]) / 1000.0
+
+    rate_l4 = (pairs_l4 / 1e6) / time_l4_sec  # Million alignments / s
     rate_a2000 = (pairs_a2000 / 1e6) / time_a2000_sec
 
     ax1.plot(pairs_l4, rate_l4, "-o", color=RUST, mec=PAPER, mew=0.7, lw=1.6, ms=5.0)
     ax1.plot(pairs_a2000, rate_a2000, "--s", color=COBALT, mec=PAPER, mew=0.7, lw=1.3, ms=4.5)
-    ax1.axhline(1.46, color=REF, lw=0.9, ls=DOT)
+    ax1.axhline(cpu_rate, color=REF, lw=0.9, ls=DOT)
 
     ax1.set_xscale("log")
     plain_log_axis(ax1, "x")
@@ -116,18 +158,21 @@ def main():
     ax1.set_ylabel("million alignments / s")
 
     # Clean inline annotations matching benchmark_scaling.png
-    end_label(ax1, pairs_l4[-1], rate_l4[-1], "CUDA L4 (38.3M/s)", dx=6, dy=1)
-    end_label(ax1, pairs_a2000[-1], rate_a2000[-1], "A2000 (14.3M/s)", dx=6, dy=-12)
-    ax1.text(3.5e6, 3.2, "8T Cloud CPU (1.46M/s)", fontsize=6.5, color=INK2)
+    end_label(ax1, pairs_l4[-1], rate_l4[-1], f"CUDA L4 ({rate_l4[-1]:.1f}M/s)", dx=6, dy=1)
+    end_label(ax1, pairs_a2000[-1], rate_a2000[-1], f"A2000 ({rate_a2000[-1]:.1f}M/s)", dx=6, dy=-12)
+    ax1.text(3.5e6, 3.2, f"8T Cloud CPU ({cpu_rate:.2f}M/s)", fontsize=6.5, color=INK2)
 
     # OOM marker
-    ax1.scatter([2.25e8, 4.0e8], [14.34, 14.34], marker="x", color=INK2, s=40, zorder=5, lw=1.2)
+    ax1.scatter([2.25e8, 4.0e8], [rate_a2000[-1], rate_a2000[-1]], marker="x", color=INK2, s=40, zorder=5, lw=1.2)
     ax1.text(3.1e8, 17.5, "OOM (>4GB)", fontsize=6.2, color=INK2, ha="center")
 
+    total_pairs = pairs_l4[-1]
+    time_max = time_l4_sec[-1]
+    atom_pairs_rate = (total_pairs * 250) / time_max / 1e9
     titles(
         ax1,
-        "L4 reaches 38.3M alignments/s scaling to 400M pairs",
-        "250-atom CA; L4 (24GB) vs RTX A2000 (4GB); 400M pairs in 10.45s (9.57B atom-pairs/s)",
+        f"L4 reaches {rate_l4[-1]:.1f}M alignments/s scaling to 400M pairs",
+        f"250-atom CA; L4 (24GB) vs RTX A2000 (4GB); 400M pairs in {time_max:.2f}s ({atom_pairs_rate:.2f}B atom-pairs/s)",
     )
 
     # =========================================================================
@@ -135,12 +180,12 @@ def main():
     # Vertical lollipop bars with crisp spacing and clean top speedup labels
     # =========================================================================
     benchmarks = [
-        ("Pose RMSD\n(10k)", 327.6, RUST),
-        ("Shrake BSA\n(2k at.)", 81.3, COBALT),
-        ("pH ddG\n(6.0/7.4)", 53.1, COBALT),
-        ("DCD Filter\n(100x RAM)", 44.9, JADE),
-        ("AF-Cluster\n(5k x 256)", 38.0, JADE),
-        ("Novelty DB\n(5k x 500)", 1792.0, RUST),
+        ("Pose RMSD\n(10k)", sp_pose, RUST),
+        ("Shrake BSA\n(2k at.)", sp_bsa, COBALT),
+        ("pH ddG\n(6.0/7.4)", sp_ph, COBALT),
+        ("DCD Filter\n(100x RAM)", sp_dcd, JADE),
+        ("AF-Cluster\n(est. 5k)", sp_af, JADE),
+        ("Novelty DB\n(5k x 500)", sp_nov, RUST),
     ]
     xs = np.arange(len(benchmarks)) * 1.35  # Wider horizontal stride to avoid x-tick collision
 

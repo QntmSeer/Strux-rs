@@ -1,0 +1,17 @@
+suite,benchmark,strux_ms,strux_iqr_ms,baseline_ms,baseline_name,speedup
+Suite1_CIF_Triage,parse_cif_full_1000_complexes,595.69,42.256,4303.813,Python_MMCIF_Parser,7.22
+Suite1_CIF_Triage,batch_pose_and_sc_rmsd_10000,4.03,0.349,1695.591,NumPy_SVD_Superimposer,420.71
+Suite1_CIF_Triage,analyze_interface_physics_1000_complexes,2419.728,627.49,27694.318,Python_NumPy_Interface_Screener,11.45
+Suite1_CIF_Triage,calculate_bsa_shrake_rupley_per_complex,1.955,0.408,154.215,Python_ShrakeRupley_96pt,78.88
+Suite1_CIF_Triage,calculate_ph_switch_ddg,0.2246,0.0924,24.7244,Python_DebyeHuckel_Screener,110.07
+Suite1_CIF_Triage,anm_modes_hessian_eigensolver,139.713,20.499,107.193,Python_ANM_Hessian_eigh,0.77
+Suite2_Trajectory_GPU,parse_xtc_solute_filtered_40k_to_400,47.963,1.144,62.729,Full_Solvated_XTC_Load,1.31
+Suite2_Trajectory_GPU,parse_dcd_solute_filtered_40k_to_400,1.948,0.292,56.138,Full_Solvated_DCD_Load,28.82
+Suite2_Trajectory_GPU,cuda_pairwise_rmsd_1000x1000_250atoms,211.425,5.402,310.415,Rayon_CPU_16T,1.47
+Suite2_Trajectory_GPU,cuda_pairwise_rmsd_2500x2500_250atoms,552.652,6.776,1940.093,Rayon_CPU_16T,3.51
+Suite2_Trajectory_GPU,cuda_pairwise_rmsd_5000x5000_250atoms,1843.12,1.904,7760.373,Rayon_CPU_16T,4.21
+Suite2_Trajectory_GPU,cuda_pairwise_rmsd_10000x10000_250atoms,6969.564,2.793,31041.491,Rayon_CPU_16T,4.45
+Suite2_Trajectory_GPU,full_ams_loop_5000frames_250atoms,11164.681,103.108,502410.661,PyEMMA_MDTraj_Estimated,45.0
+Suite3_Sequence_MSA,screen_sequences_biophysics_100000,67.106,1.367,1878.913,Python_Biophysics_Screener,28.0
+Suite3_Sequence_MSA,sliding_kmer_novelty_5000x500_k15,9477.448,139.526,21694711.042,Python_Sliding_Kmer,2289.09
+Suite3_Sequence_MSA,af_cluster_a3m_5000x256,6.129,0.994,232.897,Biopython_SeqIO_CDHIT_Est,38.0

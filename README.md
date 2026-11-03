@@ -152,14 +152,14 @@ Head-to-head comparison across standard computational biology packages on identi
 #### B. Cloud NVIDIA L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
 | Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | L4 Throughput / Speedup |
 | :--- | :---: | :---: | :---: |
-| **1,000 × 1,000 frames** (1.0M pairs) | 211.4 ms | **164.4 ms** | 1.52 B atom-pairs/s (4.18× vs 8T CPU) |
-| **5,000 × 5,000 frames** (25.0M pairs) | 1,843.1 ms | **790.2 ms** | 7.91 B atom-pairs/s (21.73× vs 8T CPU) |
-| **10,000 × 10,000 frames** (100.0M pairs) | 6,969.6 ms | **2,720.6 ms** | 9.19 B atom-pairs/s (25.25× vs 8T CPU) |
-| **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM barrier)* | **10,447.5 ms (10.45s)** | **9.57 B atom-pairs/s (26.30× vs 8T CPU)** |
+| **1,000 × 1,000 frames** (1.0M pairs) | 211.4 ms | **167.2 ms** | 1.50 B atom-pairs/s (4.08× vs 8T CPU) |
+| **5,000 × 5,000 frames** (25.0M pairs) | 1,843.1 ms | **775.1 ms** | 8.06 B atom-pairs/s (22.01× vs 8T CPU) |
+| **10,000 × 10,000 frames** (100.0M pairs) | 6,969.6 ms | **2,658.7 ms** | 9.40 B atom-pairs/s (25.67× vs 8T CPU) |
+| **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM barrier)* | **10,188.1 ms (10.19s)** | **9.82 B atom-pairs/s (26.80× vs 8T CPU)** |
 | **5,000-Frame AMS Feedback Loop** (lDDT + PCA + Daura + MSM) | 11,164.7 ms | **7,877.7 ms** | Complete ensemble analysis in 7.88s |
-| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.03 ms | **8.20 ms** | **327.6× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
-| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.96 ms | **9.21 ms** | **81.3× vs pure Python** |
-| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,477.5 ms | **7,431.3 ms** | **1,792.0× vs Python** (7.4s vs ~3.7 hours) |
+| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.03 ms | **8.24 ms** | **296.8× vs NumPy SVD** ($\Delta < 1.55 \times 10^{-6}\text{ \AA}$) |
+| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.96 ms | **9.25 ms** | **85.6× vs pure Python** |
+| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,477.5 ms | **7,461.3 ms** | **1,799.4× vs Python** (7.46s vs ~3.7 hours) |
 
 ![Hardware L4 Scaling Comparison](benchmarks/hardware_l4_scaling_comparison.png?v=0.5.1)
 
