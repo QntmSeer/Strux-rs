@@ -128,7 +128,7 @@ impl GpuTrajectoryEngine {
             return self.dev.dtoh_sync_copy(&d_dist);
         }
 
-        // Tiled block computation for massive trajectories
+        // Tiled block computation for massive trajectories exploiting pairwise symmetry
         let chunk_size = 8192;
         let mut host_dist = vec![0.0f32; num_frames * num_frames];
         let mut d_tile = self.dev.alloc_zeros::<f32>(chunk_size * chunk_size)?;
@@ -136,7 +136,7 @@ impl GpuTrajectoryEngine {
         let _nvtx_tiles = nvtx::NvtxRange::new("qcp_tiled_solve_blocks");
         for r_start in (0..num_frames).step_by(chunk_size) {
             let r_len = (num_frames - r_start).min(chunk_size);
-            for c_start in (0..num_frames).step_by(chunk_size) {
+            for c_start in (r_start..num_frames).step_by(chunk_size) {
                 let c_len = (num_frames - c_start).min(chunk_size);
 
                 let grid_x = c_len.div_ceil(tile_dim);
@@ -164,13 +164,29 @@ impl GpuTrajectoryEngine {
                     )?;
                 }
 
-                // Copy tile from device back to host
+                // Copy tile from device back to host and mirror off-diagonal blocks
                 let tile_data = self.dev.dtoh_sync_copy(&d_tile)?;
-                for r in 0..r_len {
-                    let src_offset = r * c_len;
-                    let dst_offset = (r_start + r) * num_frames + c_start;
-                    host_dist[dst_offset..dst_offset + c_len]
-                        .copy_from_slice(&tile_data[src_offset..src_offset + c_len]);
+                if r_start == c_start {
+                    for r in 0..r_len {
+                        let src_offset = r * c_len;
+                        let dst_offset = (r_start + r) * num_frames + c_start;
+                        host_dist[dst_offset..dst_offset + c_len]
+                            .copy_from_slice(&tile_data[src_offset..src_offset + c_len]);
+                    }
+                } else {
+                    for r in 0..r_len {
+                        let src_offset = r * c_len;
+                        let dst_offset = (r_start + r) * num_frames + c_start;
+                        host_dist[dst_offset..dst_offset + c_len]
+                            .copy_from_slice(&tile_data[src_offset..src_offset + c_len]);
+                    }
+                    // Write mirrored lower-triangular block with sequential row-major cache locality
+                    for c in 0..c_len {
+                        let dst_col_offset = (c_start + c) * num_frames + r_start;
+                        for r in 0..r_len {
+                            host_dist[dst_col_offset + r] = tile_data[r * c_len + c];
+                        }
+                    }
                 }
             }
         }

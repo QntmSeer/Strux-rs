@@ -1,5 +1,5 @@
 // ponytail: high-throughput therapeutic binder & ensemble biophysics kernels (Challenges 01-05).
-use nalgebra::{DMatrix, Vector3};
+use nalgebra::{DMatrix, Matrix3, Vector3};
 use rayon::prelude::*;
 use std::f32::consts::PI;
 
@@ -851,4 +851,288 @@ pub fn sliding_kmer_novelty(
         hammings.push(hm);
     }
     (idents, hammings)
+}
+
+// ============================================================================
+// 9. PERIODIC BOUNDARY CONDITION (PBC) UNWRAPPING
+// ============================================================================
+
+/// In-place minimum-image unwrapping along a sequential chain.
+pub fn unwrap_pbc_inplace(coords: &mut [[f32; 3]], box_dims: [f32; 3]) {
+    if coords.len() <= 1 {
+        return;
+    }
+    for i in 1..coords.len() {
+        for d in 0..3 {
+            let l = box_dims[d];
+            if l > 0.0 && l.is_finite() {
+                let dx = coords[i][d] - coords[i - 1][d];
+                let shift = (dx / l).round() * l;
+                coords[i][d] -= shift;
+            }
+        }
+    }
+}
+
+/// Unwraps coordinates of a bonded molecular chain across periodic boundaries
+/// using minimum image convention relative to preceding bonded atoms.
+pub fn unwrap_pbc(coords: &[[f32; 3]], box_dims: [f32; 3]) -> Vec<[f32; 3]> {
+    let mut unwrapped = coords.to_vec();
+    unwrap_pbc_inplace(&mut unwrapped, box_dims);
+    unwrapped
+}
+
+/// Unwraps an entire trajectory removing frame-to-frame center-of-mass periodic jumps ("nojump").
+pub fn unwrap_trajectory_nojump(
+    frames_flat: &[f32],
+    num_frames: usize,
+    num_atoms: usize,
+    box_dims: [f32; 3],
+) -> Vec<f32> {
+    if num_frames == 0 || num_atoms == 0 {
+        return frames_flat.to_vec();
+    }
+    let frame_stride = num_atoms * 3;
+    let mut unwrapped = frames_flat.to_vec();
+    let inv_n = 1.0f32 / (num_atoms as f32);
+
+    let mut prev_com = [0.0f32; 3];
+    for a in 0..num_atoms {
+        let base = a * 3;
+        prev_com[0] += unwrapped[base];
+        prev_com[1] += unwrapped[base + 1];
+        prev_com[2] += unwrapped[base + 2];
+    }
+    prev_com[0] *= inv_n;
+    prev_com[1] *= inv_n;
+    prev_com[2] *= inv_n;
+
+    let mut cumulative_shift = [0.0f32; 3];
+
+    for f in 1..num_frames {
+        let f_offset = f * frame_stride;
+        let mut cur_com = [0.0f32; 3];
+        for a in 0..num_atoms {
+            let base = f_offset + a * 3;
+            cur_com[0] += unwrapped[base];
+            cur_com[1] += unwrapped[base + 1];
+            cur_com[2] += unwrapped[base + 2];
+        }
+        cur_com[0] *= inv_n;
+        cur_com[1] *= inv_n;
+        cur_com[2] *= inv_n;
+
+        for d in 0..3 {
+            let l = box_dims[d];
+            if l > 0.0 && l.is_finite() {
+                let shifted_cur = cur_com[d] + cumulative_shift[d];
+                let d_com = shifted_cur - prev_com[d];
+                let jump = (d_com / l).round() * l;
+                cumulative_shift[d] -= jump;
+            }
+        }
+
+        for a in 0..num_atoms {
+            let base = f_offset + a * 3;
+            unwrapped[base] += cumulative_shift[0];
+            unwrapped[base + 1] += cumulative_shift[1];
+            unwrapped[base + 2] += cumulative_shift[2];
+        }
+
+        prev_com[0] = cur_com[0] + cumulative_shift[0];
+        prev_com[1] = cur_com[1] + cumulative_shift[1];
+        prev_com[2] = cur_com[2] + cumulative_shift[2];
+    }
+
+    unwrapped
+}
+
+/// Build the column-basis cell matrix M = [a | b | c] and its inverse from a row-major 3x3
+/// box_vectors slice [ax, ay, az, bx, by, bz, cx, cy, cz]. Returns None if degenerate/singular.
+#[inline]
+fn cell_matrix_and_inv(box_slice: &[f32]) -> Option<(Matrix3<f32>, Matrix3<f32>)> {
+    if box_slice.len() < 9 || !box_slice[..9].iter().all(|v| v.is_finite()) {
+        return None;
+    }
+    let a = Vector3::new(box_slice[0], box_slice[1], box_slice[2]);
+    let b = Vector3::new(box_slice[3], box_slice[4], box_slice[5]);
+    let c = Vector3::new(box_slice[6], box_slice[7], box_slice[8]);
+    let m = Matrix3::from_columns(&[a, b, c]);
+    if m.determinant().abs() < 1e-8 {
+        return None;
+    }
+    m.try_inverse().map(|inv| (m, inv))
+}
+
+/// Exact Euclidean minimum-image lattice shift for reduced triclinic / rhombic dodecahedron cells.
+/// Starts at `s_int = round(M^-1 dr)` and searches the 27 lattice neighbors `s_int + {-1, 0, 1}^3`
+/// minimizing `||dr - M * n||^2` (fixes Voronoi-corner failures of naive fractional rounding).
+#[inline]
+fn mic_shift(dr: Vector3<f32>, m: &Matrix3<f32>, m_inv: &Matrix3<f32>) -> Vector3<f32> {
+    let s = m_inv * dr;
+    let base = Vector3::new(s[0].round(), s[1].round(), s[2].round());
+    let mut best_shift = m * base;
+    let mut best_d2 = (dr - best_shift).norm_squared();
+    for di in -1..=1 {
+        for dj in -1..=1 {
+            for dk in -1..=1 {
+                if di == 0 && dj == 0 && dk == 0 {
+                    continue;
+                }
+                let n = Vector3::new(base[0] + di as f32, base[1] + dj as f32, base[2] + dk as f32);
+                let cand_shift = m * n;
+                let d2 = (dr - cand_shift).norm_squared();
+                if d2 < best_d2 {
+                    best_d2 = d2;
+                    best_shift = cand_shift;
+                }
+            }
+        }
+    }
+    best_shift
+}
+
+/// Triclinic & NPT-aware two-stage molecular imaging (Rayon frame-parallel).
+///
+/// Stage 1: Makes each molecule `(start, end)` in `mol_ranges` whole by sequentially applying
+/// 27-neighbor Euclidean minimum-image shifts relative to the preceding atom.
+/// Stage 2: Shifts each molecule's center of mass into the Voronoi/Wigner-Seitz periodic image
+/// closest to `anchor_mol`.
+///
+/// `coords_flat`: `[num_frames * num_atoms * 3]` (Å)
+/// `box_vectors_flat`: `[num_frames * 9]` row-major 3x3 cell matrices (Å)
+pub fn image_molecules(
+    coords_flat: &[f32],
+    num_frames: usize,
+    num_atoms: usize,
+    box_vectors_flat: &[f32],
+    mol_ranges: &[(usize, usize)],
+    anchor_mol: usize,
+) -> Vec<f32> {
+    let frame_stride = num_atoms.saturating_mul(3);
+    if num_frames == 0
+        || num_atoms == 0
+        || mol_ranges.is_empty()
+        || coords_flat.len() < num_frames.saturating_mul(frame_stride)
+        || box_vectors_flat.len() < num_frames.saturating_mul(9)
+    {
+        return coords_flat.to_vec();
+    }
+    let mut out = coords_flat[..num_frames * frame_stride].to_vec();
+    let anchor_idx = anchor_mol.min(mol_ranges.len() - 1);
+
+    out.par_chunks_mut(frame_stride)
+        .enumerate()
+        .for_each(|(f, frame)| {
+            let b_off = f * 9;
+            let Some((m, m_inv)) = cell_matrix_and_inv(&box_vectors_flat[b_off..b_off + 9]) else {
+                return;
+            };
+
+            // Stage 1: make each molecule whole sequentially
+            for &(start, end) in mol_ranges {
+                if end <= start + 1 || end > num_atoms {
+                    continue;
+                }
+                for a in (start + 1)..end {
+                    let prev_base = (a - 1) * 3;
+                    let cur_base = a * 3;
+                    let prev = Vector3::new(frame[prev_base], frame[prev_base + 1], frame[prev_base + 2]);
+                    let cur = Vector3::new(frame[cur_base], frame[cur_base + 1], frame[cur_base + 2]);
+                    let shift = mic_shift(cur - prev, &m, &m_inv);
+                    frame[cur_base] -= shift[0];
+                    frame[cur_base + 1] -= shift[1];
+                    frame[cur_base + 2] -= shift[2];
+                }
+            }
+
+            // Stage 2: compute anchor COM and shift every other molecule into nearest image
+            let (a_start, a_end) = mol_ranges[anchor_idx];
+            if a_end <= a_start || a_end > num_atoms {
+                return;
+            }
+            let mut anchor_com = Vector3::<f32>::zeros();
+            for a in a_start..a_end {
+                let base = a * 3;
+                anchor_com += Vector3::new(frame[base], frame[base + 1], frame[base + 2]);
+            }
+            anchor_com /= (a_end - a_start) as f32;
+
+            for (mi, &(start, end)) in mol_ranges.iter().enumerate() {
+                if mi == anchor_idx || end <= start || end > num_atoms {
+                    continue;
+                }
+                let mut com = Vector3::<f32>::zeros();
+                for a in start..end {
+                    let base = a * 3;
+                    com += Vector3::new(frame[base], frame[base + 1], frame[base + 2]);
+                }
+                com /= (end - start) as f32;
+                let shift = mic_shift(com - anchor_com, &m, &m_inv);
+                for a in start..end {
+                    let base = a * 3;
+                    frame[base] -= shift[0];
+                    frame[base + 1] -= shift[1];
+                    frame[base + 2] -= shift[2];
+                }
+            }
+        });
+
+    out
+}
+
+/// NPT & triclinic-aware trajectory "nojump" unwrapping using per-frame 3x3 `box_vectors` (Å).
+/// Tracks raw frame-to-frame COM displacement directly to avoid f32 cancellation on long trajectories.
+pub fn unwrap_trajectory_nojump_box(
+    frames_flat: &[f32],
+    num_frames: usize,
+    num_atoms: usize,
+    box_vectors_flat: &[f32],
+) -> Vec<f32> {
+    let frame_stride = num_atoms.saturating_mul(3);
+    if num_frames == 0
+        || num_atoms == 0
+        || frames_flat.len() < num_frames.saturating_mul(frame_stride)
+        || box_vectors_flat.len() < num_frames.saturating_mul(9)
+    {
+        return frames_flat.to_vec();
+    }
+    let mut unwrapped = frames_flat[..num_frames * frame_stride].to_vec();
+    let inv_n = 1.0f32 / (num_atoms as f32);
+
+    let mut prev_raw_com = Vector3::<f32>::zeros();
+    for a in 0..num_atoms {
+        let base = a * 3;
+        prev_raw_com += Vector3::new(unwrapped[base], unwrapped[base + 1], unwrapped[base + 2]);
+    }
+    prev_raw_com *= inv_n;
+
+    let mut cumulative_shift = Vector3::<f32>::zeros();
+
+    for f in 1..num_frames {
+        let f_offset = f * frame_stride;
+        let mut cur_raw_com = Vector3::<f32>::zeros();
+        for a in 0..num_atoms {
+            let base = f_offset + a * 3;
+            cur_raw_com += Vector3::new(unwrapped[base], unwrapped[base + 1], unwrapped[base + 2]);
+        }
+        cur_raw_com *= inv_n;
+
+        let b_off = f * 9;
+        if let Some((m, m_inv)) = cell_matrix_and_inv(&box_vectors_flat[b_off..b_off + 9]) {
+            let jump = mic_shift(cur_raw_com - prev_raw_com, &m, &m_inv);
+            cumulative_shift -= jump;
+        }
+
+        for a in 0..num_atoms {
+            let base = f_offset + a * 3;
+            unwrapped[base] += cumulative_shift[0];
+            unwrapped[base + 1] += cumulative_shift[1];
+            unwrapped[base + 2] += cumulative_shift[2];
+        }
+
+        prev_raw_com = cur_raw_com;
+    }
+
+    unwrapped
 }

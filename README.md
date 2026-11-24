@@ -154,16 +154,16 @@ Head-to-head comparison across standard computational biology packages on identi
 #### B. Cross-Hardware Scaling: H100 (80 GB) vs. Cloud L4 (24 GB) vs. Laptop RTX A2000 (4 GB)
 | Workload & System Scale | Laptop RTX A2000 (4 GB, 35W) | Cloud NVIDIA L4 (24 GB, 72W) | Data Center H100 (80 GB, 700W) | Max Throughput / Speedup |
 | :--- | :---: | :---: | :---: | :---: |
-| **1,000 × 1,000 frames** (1.0M pairs) | 76.9 ms | 23.6 ms | **2.12 ms** | 117.9 B atom-pairs/s (471M align/s) |
-| **5,000 × 5,000 frames** (25.0M pairs) | 1,796.4 ms (1.80s) | 635.7 ms | **107.7 ms** | 58.0 B atom-pairs/s (232M align/s) |
-| **10,000 × 10,000 frames** (100.0M pairs) | 7,070.0 ms (7.07s) | 2,532.5 ms (2.53s) | **428.7 ms** | 58.3 B atom-pairs/s (233M align/s) |
+| **1,000 × 1,000 frames** (1.0M pairs) | 75.6 ms | 23.6 ms | **2.12 ms** | 117.9 B atom-pairs/s (471M align/s) |
+| **5,000 × 5,000 frames** (25.0M pairs) | 1,774.1 ms (1.77s) | 635.7 ms | **107.7 ms** | 58.0 B atom-pairs/s (232M align/s) |
+| **10,000 × 10,000 frames** (100.0M pairs) | 7,103.0 ms (7.10s) | 2,532.5 ms (2.53s) | **428.7 ms** | 58.3 B atom-pairs/s (233M align/s) |
 | **20,000 × 20,000 frames** (400.0M pairs) | *OOM (>4 GB VRAM)* | 10,068.9 ms (10.07s) | **1,704.3 ms (1.70s)** | 58.7 B atom-pairs/s (235M align/s) |
-| **5,000-Frame AMS Feedback Loop** | 10,336.3 ms | 8,563.7 ms | **4,698.5 ms** | Complete ensemble analysis in 4.70s |
-| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.19 ms | 8.31 ms | **2.95 ms** | **357.9× vs NumPy SVD** (H100 host CPU) |
-| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.39 ms | 9.90 ms | **1.14 ms** | **107.6× vs pure Python** |
-| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,369.8 ms | 7,699.1 ms | **5,809.1 ms** | **3,325.9× vs Python** (5.8s vs ~5.4 hours) |
+| **5,000-Frame AMS Feedback Loop** | 10,305.5 ms | 8,563.7 ms | **4,698.5 ms** | Complete ensemble analysis in 4.70s |
+| **Target-Anchored Pose + scRMSD** (10,000 designs) | 4.32 ms | 8.31 ms | **2.95 ms** | **357.9× vs NumPy SVD** (H100 host CPU) |
+| **Shrake-Rupley BSA** (2,048 atoms, 96 points) | 1.82 ms | 9.90 ms | **1.14 ms** | **107.6× vs pure Python** |
+| **Sliding 15-mer Novelty DB** (5k queries × 500 refs) | 9,358.8 ms | 7,699.1 ms | **5,809.1 ms** | **3,325.9× vs Python** (5.8s vs ~5.4 hours) |
 
-Builds per column: **RTX A2000** and **L4** on released 0.5.2 (`git_commit` recorded in each results file), **H100** on a source build of the same CUDA changes before the release. From 0.5.2 the CUDA engine is a process-wide singleton, which removes the roughly 120-150 ms driver context and PTX JIT cost every `cuda_*` call used to pay. At 1,000 x 1,000 that cut the H100 from 150.3 ms to 2.1 ms, the L4 from 167.2 ms to 23.6 ms and the A2000 from 196.4 ms to 76.9 ms. The gain differs because the fixed cost was a different share of each call: from about 5,000 frames up the GPUs hold steady per-pair costs (A2000 ~71 ms, L4 ~25 ms, H100 ~4.3 ms per million pairs), so they are compute-bound rather than dispatch-bound.
+Builds per column: **RTX A2000** (warm-state) and **L4** on released 0.5.2 (`git_commit` recorded in each results file), **H100** on a source build of the same CUDA changes before the release. From 0.5.2 the CUDA engine is a process-wide singleton, which removes the roughly 120-150 ms driver context and PTX JIT cost every `cuda_*` call used to pay. At 1,000 x 1,000 that cut the H100 from 150.3 ms to 2.1 ms, the L4 from 167.2 ms to 23.6 ms and the A2000 from 196.4 ms to 75.6 ms. The gain differs because the fixed cost was a different share of each call: from about 5,000 frames up the GPUs hold steady per-pair costs (A2000 ~71 ms, L4 ~25 ms, H100 ~4.3 ms per million pairs), so they are compute-bound rather than dispatch-bound.
 
 ![Hardware Scaling Comparison](benchmarks/hardware_scaling_comparison.png?v=0.5.2c)
 

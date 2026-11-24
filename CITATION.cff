@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use strux-rs in your research, please cite it as below."
+title: "strux-rs"
+authors:
+  - family-names: "Gangadharaiah"
+    given-names: "Karthik"
+version: "0.6.0"
+repository-code: "https://github.com/QntmSeer/Strux-rs"
+license: "MIT"

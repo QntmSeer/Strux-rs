@@ -11,6 +11,8 @@ pub struct XtcTrajectory {
     pub num_atoms: usize,
     /// Coordinates in Angstroms [num_frames * num_atoms * 3]
     pub coords: Vec<f32>,
+    /// Per-frame 3x3 unit-cell matrices [num_frames * 9] in Angstroms (row-major: a, b, c)
+    pub box_vectors: Vec<f32>,
     pub times: Vec<f32>,
     pub steps: Vec<i32>,
 }
@@ -311,6 +313,7 @@ pub fn parse_xtc_trajectory_selected<P: AsRef<Path>>(
 
     let mut offset = 0usize;
     let mut frames = Vec::new();
+    let mut box_vectors_all = Vec::new();
     let mut times_all = Vec::new();
     let mut steps_all = Vec::new();
     let mut num_atoms_global = 0usize;
@@ -332,6 +335,11 @@ pub fn parse_xtc_trajectory_selected<P: AsRef<Path>>(
         let natoms = natoms_raw as usize;
         let step = i32::from_be_bytes(data[offset + 8..offset + 12].try_into().unwrap());
         let time = f32::from_be_bytes(data[offset + 12..offset + 16].try_into().unwrap());
+        let mut frame_box = [0.0f32; 9];
+        for k in 0..9 {
+            let s = offset + 16 + k * 4;
+            frame_box[k] = f32::from_be_bytes(data[s..s + 4].try_into().unwrap()) * 10.0;
+        }
         offset += 56; // 16 header + 36 box + 4 lsize
 
         if num_atoms_global == 0 {
@@ -384,6 +392,7 @@ pub fn parse_xtc_trajectory_selected<P: AsRef<Path>>(
             offset = comp_offset.saturating_add(padded_nbytes);
         }
 
+        box_vectors_all.extend_from_slice(&frame_box);
         times_all.push(time);
         steps_all.push(step);
     }
@@ -437,6 +446,7 @@ pub fn parse_xtc_trajectory_selected<P: AsRef<Path>>(
         num_frames,
         num_atoms: out_atoms,
         coords: coords_all,
+        box_vectors: box_vectors_all,
         times: times_all,
         steps: steps_all,
     })

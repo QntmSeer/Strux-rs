@@ -59,6 +59,11 @@ jobs:
         with:
           target: aarch64-apple-darwin
           args: --release --out dist
+      - name: Test macOS wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install dist/*.whl pytest numpy scipy mdtraj
+          pytest tests/test_trajectory_formats.py tests/test_ams_features.py tests/test_cuda_fallback.py tests/test_msa.py -v
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-macos-aarch64
@@ -69,6 +74,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: actions/download-artifact@v4
         with:
           name: qcp-ptx
@@ -78,6 +86,12 @@ jobs:
         with:
           target: x86_64
           args: --release --features cuda --out dist
+      - name: Test Windows wheel
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install dist/*.whl pytest numpy scipy mdtraj
+          pytest tests/test_trajectory_formats.py tests/test_ams_features.py tests/test_cuda_fallback.py tests/test_msa.py -v
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-x64
@@ -97,8 +111,29 @@ jobs:
           name: wheels-sdist
           path: dist
 
+  test:
+    needs: linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run Rust test suite
+        run: cargo test --no-default-features
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels-linux-x86_64
+          path: dist
+      - name: Install wheel and run pytest suite
+        run: |
+          python -m pip install --upgrade pip
+          pip install dist/*.whl pytest numpy scipy mdtraj freesasa
+          pytest tests/test_trajectory_formats.py tests/test_accuracy.py tests/test_ams_features.py tests/test_cuda_fallback.py tests/test_msa.py -v
+
   publish:
-    needs: [linux, macos, windows, sdist]
+    needs: [test, linux, macos, windows, sdist]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
