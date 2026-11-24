@@ -167,7 +167,13 @@ def unwrap_trajectory_nojump_box(
     traj: NDArray[np.float32],
     box_vectors: NDArray[np.float32],
 ) -> NDArray[np.float32]:
-    """NPT & triclinic-aware trajectory "nojump" unwrapping using per-frame `[F, 3, 3]` box vectors (Å)."""
+    """NPT & triclinic-aware trajectory "nojump" unwrapping.
+
+    Args:
+        traj: Contiguous float32 array of shape `[F, N, 3]` (Å).
+        box_vectors: Contiguous float32 array of shape `[F, 3, 3]` (Å) in GROMACS/OpenMM
+            lower-triangular reduced form (`|bx| <= ax/2`, `|cx| <= ax/2`, `|cy| <= by/2`).
+    """
     ...
 
 def image_molecules(
@@ -176,7 +182,18 @@ def image_molecules(
     mol_ranges: Sequence[Tuple[int, int]],
     anchor_mol: int = 0,
 ) -> NDArray[np.float32]:
-    """Triclinic & NPT-aware two-stage molecular imaging: makes each `(start, end)` molecule whole and shifts its COM into the periodic image closest to `anchor_mol`."""
+    """Triclinic & NPT-aware two-stage molecular imaging (Rayon frame-parallel).
+
+    Makes each `(start, end)` molecule whole sequentially and shifts its COM into the Euclidean
+    Voronoi/Wigner-Seitz periodic image closest to `anchor_mol`.
+
+    Args:
+        coords: Contiguous float32 array of shape `[F, N, 3]` (Å).
+        box_vectors: Contiguous float32 array of shape `[F, 3, 3]` (Å) in GROMACS/OpenMM
+            lower-triangular reduced form (`|bx| <= ax/2`, `|cx| <= ax/2`, `|cy| <= by/2`).
+        mol_ranges: Non-overlapping half-open `(start, end)` atom index ranges per molecule.
+        anchor_mol: Index into `mol_ranges` identifying the anchor molecule (must be non-empty).
+    """
     ...
 
 def calculate_rg(coords: NDArray[np.float32]) -> float:

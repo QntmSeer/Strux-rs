@@ -284,3 +284,18 @@ def test_image_molecules_and_nojump_box_triclinic() -> None:
 
     with pytest.raises(ValueError):
         strux_rs.image_molecules(coords, boxes, [(0, 4), (3, 6)], anchor_mol=0)
+
+    # Empty anchor molecule range must raise ValueError
+    with pytest.raises(ValueError):
+        strux_rs.image_molecules(c_bound, d100, [(0, 0), (1, 2)], anchor_mol=0)
+
+    # Non-reduced sheared triclinic cells must raise ValueError rather than fail silently
+    for bad_cell in (
+        [[[200.0, 0.0, 0.0], [190.0, 8.0, 0.0], [5.0, 190.0, 8.0]]],
+        [[[50.0, 0.0, 0.0], [49.0, 5.0, 0.0], [0.0, 49.0, 5.0]]],
+    ):
+        bad_box = np.array(bad_cell, dtype=np.float32)
+        with pytest.raises(ValueError, match="Non-reduced"):
+            strux_rs.image_molecules(c_bound, bad_box, [(0, 1), (1, 2)], anchor_mol=0)
+        with pytest.raises(ValueError, match="Non-reduced"):
+            strux_rs.unwrap_trajectory_nojump_box(c_bound, bad_box)

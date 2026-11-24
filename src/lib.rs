@@ -1136,6 +1136,39 @@ fn unwrap_trajectory_nojump<'py>(
     Ok(array)
 }
 
+#[inline]
+fn validate_reduced_box_vectors(b_slice: &[f32], num_frames: usize) -> PyResult<()> {
+    for f in 0..num_frames {
+        let b = &b_slice[f * 9..(f + 1) * 9];
+        if !b.iter().all(|v| v.is_finite()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Non-finite box_vectors at frame {}: {:?}",
+                f, b
+            )));
+        }
+        let (ax, ay, az) = (b[0], b[1], b[2]);
+        let (bx, by, bz) = (b[3], b[4], b[5]);
+        let (cx, cy, cz) = (b[6], b[7], b[8]);
+        let scale = ax.abs().max(by.abs()).max(cz.abs()).max(1.0);
+        let tol = 1e-4 * scale;
+        let is_lower_tri = ay.abs() <= tol && az.abs() <= tol && bz.abs() <= tol;
+        let is_reduced = ax > 0.0
+            && by > 0.0
+            && cz > 0.0
+            && bx.abs() <= 0.5 * ax + tol
+            && cx.abs() <= 0.5 * ax + tol
+            && cy.abs() <= 0.5 * by + tol;
+        if !(is_lower_tri && is_reduced) {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Non-reduced or invalid triclinic cell at frame {}: [[{}, {}, {}], [{}, {}, {}], [{}, {}, {}]]. \
+                 Expected GROMACS/OpenMM lower-triangular reduced form (ax,by,cz > 0, |bx| <= ax/2, |cx| <= ax/2, |cy| <= by/2).",
+                f, ax, ay, az, bx, by, bz, cx, cy, cz
+            )));
+        }
+    }
+    Ok(())
+}
+
 #[pyfunction]
 #[pyo3(signature = (coords, box_vectors, mol_ranges, anchor_mol=0))]
 fn image_molecules<'py>(
@@ -1161,6 +1194,7 @@ fn image_molecules<'py>(
     let b_slice = box_vectors.as_slice().map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!("box_vectors array must be contiguous C-order: {:?}", e))
     })?;
+    validate_reduced_box_vectors(b_slice, num_frames)?;
 
     for &(start, end) in &mol_ranges {
         if start > end || end > num_atoms {
@@ -1180,12 +1214,21 @@ fn image_molecules<'py>(
             )));
         }
     }
-    if !mol_ranges.is_empty() && anchor_mol >= mol_ranges.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "anchor_mol {} out of range for {} molecules",
-            anchor_mol,
-            mol_ranges.len()
-        )));
+    if !mol_ranges.is_empty() {
+        if anchor_mol >= mol_ranges.len() {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "anchor_mol {} out of range for {} molecules",
+                anchor_mol,
+                mol_ranges.len()
+            )));
+        }
+        let (a_start, a_end) = mol_ranges[anchor_mol];
+        if a_end <= a_start {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "anchor_mol {} has empty atom range ({}, {})",
+                anchor_mol, a_start, a_end
+            )));
+        }
     }
 
     let imaged = py.allow_threads(|| {
@@ -1222,6 +1265,7 @@ fn unwrap_trajectory_nojump_box<'py>(
     let b_slice = box_vectors.as_slice().map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!("box_vectors array must be contiguous C-order: {:?}", e))
     })?;
+    validate_reduced_box_vectors(b_slice, num_frames)?;
 
     let unwrapped = py.allow_threads(|| {
         biophysics::unwrap_trajectory_nojump_box(slice, num_frames, num_atoms, b_slice)
