@@ -66,6 +66,65 @@ fn parse_pdb(
 }
 
 #[pyfunction]
+#[pyo3(signature = (path, ca_only=false, atom_indices=None))]
+fn parse_gro(
+    py: Python<'_>,
+    path: &str,
+    ca_only: bool,
+    atom_indices: Option<Vec<usize>>,
+) -> PyResult<Py<PyArray3<f32>>> {
+    let path_str = path.to_string();
+    let frames = py.allow_threads(|| {
+        pdb::parse_gro_trajectory_selected(path_str, ca_only, atom_indices.as_deref())
+    }).map_err(map_io_err)?;
+
+    if frames.is_empty() {
+        let array = PyArray3::<f32>::zeros_bound(py, [0, 0, 3], false);
+        return Ok(array.into());
+    }
+
+    let num_frames = frames.len();
+    let num_atoms = frames[0].len();
+
+    let array = PyArray3::<f32>::zeros_bound(py, [num_frames, num_atoms, 3], false);
+    {
+        let mut writer = array.readwrite();
+        let slice = writer.as_slice_mut().unwrap();
+        let mut idx = 0;
+        for frame in frames {
+            for atom in frame {
+                slice[idx] = atom[0];
+                slice[idx + 1] = atom[1];
+                slice[idx + 2] = atom[2];
+                idx += 3;
+            }
+        }
+    }
+    Ok(array.into())
+}
+
+#[pyfunction]
+#[pyo3(signature = (path, traj))]
+fn write_pdb_trajectory(
+    py: Python<'_>,
+    path: &str,
+    traj: PyReadonlyArray3<'_, f32>,
+) -> PyResult<()> {
+    let view = traj.as_array();
+    let (num_frames, num_atoms) = validate_traj3_shape(view.shape())?;
+    let slice = traj.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("Trajectory array must be contiguous C-order: {:?}", e))
+    })?;
+    let path_str = path.to_string();
+
+    py.allow_threads(|| {
+        pdb::write_pdb_trajectory(path_str, slice, num_frames, num_atoms)
+    }).map_err(map_io_err)?;
+
+    Ok(())
+}
+
+#[pyfunction]
 #[pyo3(signature = (path, ca_only=false, strip_hydrogens=true, use_auth_chain=true, atom_indices=None))]
 fn parse_cif(
     py: Python<'_>,
@@ -192,7 +251,7 @@ fn parse_dcd(
     }).map_err(map_io_err)?;
 
     if dcd_traj.num_frames == 0 || dcd_traj.num_atoms == 0 {
-        let array = PyArray3::<f32>::zeros_bound(py, [0, 0, 3], false);
+        let array = PyArray3::<f32>::zeros_bound(py, [dcd_traj.num_frames, dcd_traj.num_atoms, 3], false);
         return Ok(array.into());
     }
 
@@ -203,6 +262,44 @@ fn parse_dcd(
         slice.copy_from_slice(&dcd_traj.coords);
     }
     Ok(array.into())
+}
+
+#[pyfunction]
+#[pyo3(signature = (path, atom_indices=None))]
+fn parse_dcd_with_box(
+    py: Python<'_>,
+    path: &str,
+    atom_indices: Option<Vec<usize>>,
+) -> PyResult<(Py<PyArray3<f32>>, Option<Py<PyArray3<f32>>>)> {
+    let path_str = path.to_string();
+    let dcd_traj = py.allow_threads(|| {
+        dcd::parse_dcd_trajectory_selected(path_str, atom_indices.as_deref())
+    }).map_err(map_io_err)?;
+
+    let coords_arr = if dcd_traj.num_frames == 0 || dcd_traj.num_atoms == 0 {
+        PyArray3::<f32>::zeros_bound(py, [dcd_traj.num_frames, dcd_traj.num_atoms, 3], false)
+    } else {
+        let arr = PyArray3::<f32>::zeros_bound(py, [dcd_traj.num_frames, dcd_traj.num_atoms, 3], false);
+        {
+            let mut writer = arr.readwrite();
+            writer.as_slice_mut().unwrap().copy_from_slice(&dcd_traj.coords);
+        }
+        arr
+    };
+
+    let box_arr = match dcd_traj.box_vectors {
+        Some(bv) => {
+            let arr = PyArray3::<f32>::zeros_bound(py, [dcd_traj.num_frames, 3, 3], false);
+            if dcd_traj.num_frames > 0 {
+                let mut writer = arr.readwrite();
+                writer.as_slice_mut().unwrap().copy_from_slice(&bv);
+            }
+            Some(arr.into())
+        }
+        None => None,
+    };
+
+    Ok((coords_arr.into(), box_arr))
 }
 
 #[pyfunction]
@@ -218,7 +315,7 @@ fn parse_xtc(
     }).map_err(map_io_err)?;
 
     if xtc_traj.num_frames == 0 || xtc_traj.num_atoms == 0 {
-        let array = PyArray3::<f32>::zeros_bound(py, [0, 0, 3], false);
+        let array = PyArray3::<f32>::zeros_bound(py, [xtc_traj.num_frames, xtc_traj.num_atoms, 3], false);
         return Ok(array.into());
     }
 
@@ -229,6 +326,38 @@ fn parse_xtc(
         slice.copy_from_slice(&xtc_traj.coords);
     }
     Ok(array.into())
+}
+
+#[pyfunction]
+#[pyo3(signature = (path, atom_indices=None))]
+fn parse_xtc_with_box(
+    py: Python<'_>,
+    path: &str,
+    atom_indices: Option<Vec<usize>>,
+) -> PyResult<(Py<PyArray3<f32>>, Py<PyArray3<f32>>)> {
+    let path_str = path.to_string();
+    let xtc_traj = py.allow_threads(|| {
+        xtc::parse_xtc_trajectory_selected(path_str, atom_indices.as_deref())
+    }).map_err(map_io_err)?;
+
+    let coords_arr = if xtc_traj.num_frames == 0 || xtc_traj.num_atoms == 0 {
+        PyArray3::<f32>::zeros_bound(py, [xtc_traj.num_frames, xtc_traj.num_atoms, 3], false)
+    } else {
+        let arr = PyArray3::<f32>::zeros_bound(py, [xtc_traj.num_frames, xtc_traj.num_atoms, 3], false);
+        {
+            let mut writer = arr.readwrite();
+            writer.as_slice_mut().unwrap().copy_from_slice(&xtc_traj.coords);
+        }
+        arr
+    };
+
+    let box_arr = PyArray3::<f32>::zeros_bound(py, [xtc_traj.num_frames, 3, 3], false);
+    if xtc_traj.num_frames > 0 {
+        let mut writer = box_arr.readwrite();
+        writer.as_slice_mut().unwrap().copy_from_slice(&xtc_traj.box_vectors);
+    }
+
+    Ok((coords_arr.into(), box_arr.into()))
 }
 
 
@@ -956,16 +1085,174 @@ fn sliding_kmer_novelty<'py>(
     ))
 }
 
+#[pyfunction]
+#[pyo3(signature = (coords, box_dims))]
+fn unwrap_pbc<'py>(
+    py: Python<'py>,
+    coords: PyReadonlyArray2<'_, f32>,
+    box_dims: (f32, f32, f32),
+) -> PyResult<Bound<'py, PyArray2<f32>>> {
+    let v = readonly2_to_vec3(&coords)?;
+    let dims = [box_dims.0, box_dims.1, box_dims.2];
+    let unwrapped = py.allow_threads(|| biophysics::unwrap_pbc(&v, dims));
+    let n = unwrapped.len();
+    let array = PyArray2::<f32>::zeros_bound(py, [n, 3], false);
+    {
+        let mut writer = array.readwrite();
+        let slice = writer.as_slice_mut().unwrap();
+        for (i, atom) in unwrapped.iter().enumerate() {
+            slice[i * 3] = atom[0];
+            slice[i * 3 + 1] = atom[1];
+            slice[i * 3 + 2] = atom[2];
+        }
+    }
+    Ok(array)
+}
+
+#[pyfunction]
+#[pyo3(signature = (traj, box_dims))]
+fn unwrap_trajectory_nojump<'py>(
+    py: Python<'py>,
+    traj: PyReadonlyArray3<'_, f32>,
+    box_dims: (f32, f32, f32),
+) -> PyResult<Bound<'py, PyArray3<f32>>> {
+    let view = traj.as_array();
+    let (num_frames, num_atoms) = validate_traj3_shape(view.shape())?;
+    let slice = traj.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("Trajectory array must be contiguous C-order: {:?}", e))
+    })?;
+    let dims = [box_dims.0, box_dims.1, box_dims.2];
+
+    let unwrapped = py.allow_threads(|| {
+        biophysics::unwrap_trajectory_nojump(slice, num_frames, num_atoms, dims)
+    });
+
+    let array = PyArray3::<f32>::zeros_bound(py, [num_frames, num_atoms, 3], false);
+    {
+        let mut writer = array.readwrite();
+        let slice_out = writer.as_slice_mut().unwrap();
+        slice_out.copy_from_slice(&unwrapped);
+    }
+    Ok(array)
+}
+
+#[pyfunction]
+#[pyo3(signature = (coords, box_vectors, mol_ranges, anchor_mol=0))]
+fn image_molecules<'py>(
+    py: Python<'py>,
+    coords: PyReadonlyArray3<'_, f32>,
+    box_vectors: PyReadonlyArray3<'_, f32>,
+    mol_ranges: Vec<(usize, usize)>,
+    anchor_mol: usize,
+) -> PyResult<Bound<'py, PyArray3<f32>>> {
+    let view = coords.as_array();
+    let (num_frames, num_atoms) = validate_traj3_shape(view.shape())?;
+    let c_slice = coords.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("coords array must be contiguous C-order: {:?}", e))
+    })?;
+
+    let b_shape = box_vectors.as_array().shape().to_vec();
+    if b_shape != [num_frames, 3, 3] {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "box_vectors must have shape [{}, 3, 3], got {:?}",
+            num_frames, b_shape
+        )));
+    }
+    let b_slice = box_vectors.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("box_vectors array must be contiguous C-order: {:?}", e))
+    })?;
+
+    for &(start, end) in &mol_ranges {
+        if start > end || end > num_atoms {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid molecule range ({}, {}) for trajectory with {} atoms",
+                start, end, num_atoms
+            )));
+        }
+    }
+    let mut sorted_ranges = mol_ranges.clone();
+    sorted_ranges.sort_unstable();
+    for win in sorted_ranges.windows(2) {
+        if win[1].0 < win[0].1 {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Overlapping molecule ranges ({}, {}) and ({}, {})",
+                win[0].0, win[0].1, win[1].0, win[1].1
+            )));
+        }
+    }
+    if !mol_ranges.is_empty() && anchor_mol >= mol_ranges.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "anchor_mol {} out of range for {} molecules",
+            anchor_mol,
+            mol_ranges.len()
+        )));
+    }
+
+    let imaged = py.allow_threads(|| {
+        biophysics::image_molecules(c_slice, num_frames, num_atoms, b_slice, &mol_ranges, anchor_mol)
+    });
+
+    let array = PyArray3::<f32>::zeros_bound(py, [num_frames, num_atoms, 3], false);
+    if !imaged.is_empty() {
+        let mut writer = array.readwrite();
+        writer.as_slice_mut().unwrap().copy_from_slice(&imaged);
+    }
+    Ok(array)
+}
+
+#[pyfunction]
+#[pyo3(signature = (traj, box_vectors))]
+fn unwrap_trajectory_nojump_box<'py>(
+    py: Python<'py>,
+    traj: PyReadonlyArray3<'_, f32>,
+    box_vectors: PyReadonlyArray3<'_, f32>,
+) -> PyResult<Bound<'py, PyArray3<f32>>> {
+    let view = traj.as_array();
+    let (num_frames, num_atoms) = validate_traj3_shape(view.shape())?;
+    let slice = traj.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("Trajectory array must be contiguous C-order: {:?}", e))
+    })?;
+    let b_shape = box_vectors.as_array().shape().to_vec();
+    if b_shape != [num_frames, 3, 3] {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "box_vectors must have shape [{}, 3, 3], got {:?}",
+            num_frames, b_shape
+        )));
+    }
+    let b_slice = box_vectors.as_slice().map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!("box_vectors array must be contiguous C-order: {:?}", e))
+    })?;
+
+    let unwrapped = py.allow_threads(|| {
+        biophysics::unwrap_trajectory_nojump_box(slice, num_frames, num_atoms, b_slice)
+    });
+
+    let array = PyArray3::<f32>::zeros_bound(py, [num_frames, num_atoms, 3], false);
+    if !unwrapped.is_empty() {
+        let mut writer = array.readwrite();
+        writer.as_slice_mut().unwrap().copy_from_slice(&unwrapped);
+    }
+    Ok(array)
+}
+
 #[pymodule]
 fn strux_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_class::<Msa>()?;
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_gro, m)?)?;
+    m.add_function(wrap_pyfunction!(write_pdb_trajectory, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cif, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cif_with_plddt, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cif_full, m)?)?;
     m.add_function(wrap_pyfunction!(parse_dcd, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_dcd_with_box, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xtc, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_xtc_with_box, m)?)?;
+    m.add_function(wrap_pyfunction!(unwrap_pbc, m)?)?;
+    m.add_function(wrap_pyfunction!(unwrap_trajectory_nojump, m)?)?;
+    m.add_function(wrap_pyfunction!(unwrap_trajectory_nojump_box, m)?)?;
+    m.add_function(wrap_pyfunction!(image_molecules, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rg, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_raw, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_rmsd_kabsch, m)?)?;

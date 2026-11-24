@@ -46,6 +46,21 @@ def parse_pdb(
     """Parse a single or multi-model `.pdb` file into a `[num_frames, num_atoms, 3]` float32 array (Å)."""
     ...
 
+def parse_gro(
+    path: str,
+    ca_only: bool = False,
+    atom_indices: Optional[Sequence[int]] = None,
+) -> NDArray[np.float32]:
+    """Parse a single or multi-frame GROMACS `.gro` file into a `[num_frames, num_atoms, 3]` float32 array (Å)."""
+    ...
+
+def write_pdb_trajectory(
+    path: str,
+    traj: NDArray[np.float32],
+) -> None:
+    """Write a `[num_frames, num_atoms, 3]` float32 trajectory array to a multi-model `.pdb` file."""
+    ...
+
 def parse_cif(
     path: str,
     ca_only: bool = False,
@@ -90,11 +105,25 @@ def parse_dcd(
     """Memory-mapped CHARMM/NAMD/OpenMM `.dcd` binary trajectory reader returning `[num_frames, num_atoms, 3]` float32 (Å)."""
     ...
 
+def parse_dcd_with_box(
+    path: str,
+    atom_indices: Optional[Sequence[int]] = None,
+) -> Tuple[NDArray[np.float32], Optional[NDArray[np.float32]]]:
+    """Parse a `.dcd` trajectory returning `(coords, box_vectors)` with shapes `([F, N, 3], [F, 3, 3] | None)` in Å."""
+    ...
+
 def parse_xtc(
     path: str,
     atom_indices: Optional[Sequence[int]] = None,
 ) -> NDArray[np.float32]:
     """Pure-Rust 16T Rayon GROMACS `.xtc` XDR 3D trajectory reader returning `[num_frames, num_atoms, 3]` float32 (Å)."""
+    ...
+
+def parse_xtc_with_box(
+    path: str,
+    atom_indices: Optional[Sequence[int]] = None,
+) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+    """Parse a GROMACS `.xtc` trajectory returning `(coords, box_vectors)` with shapes `([F, N, 3], [F, 3, 3])` in Å."""
     ...
 
 def parse_a3m(a3m_string: str) -> Msa:
@@ -118,6 +147,36 @@ def cluster_msa(
     min_identity: float = 0.7,
 ) -> Tuple[NDArray[np.uintp], NDArray[np.uintp]]:
     """Rayon-parallel greedy sequence clustering (AF-Cluster style) returning `(labels, representative_indices)`."""
+    ...
+
+def unwrap_pbc(
+    coords: NDArray[np.float32],
+    box_dims: Tuple[float, float, float],
+) -> NDArray[np.float32]:
+    """Unwrap a bonded molecular chain across periodic boundary conditions using minimum-image convention."""
+    ...
+
+def unwrap_trajectory_nojump(
+    traj: NDArray[np.float32],
+    box_dims: Tuple[float, float, float],
+) -> NDArray[np.float32]:
+    """Unwrap an entire trajectory removing frame-to-frame center-of-mass periodic boundary jumps ("nojump")."""
+    ...
+
+def unwrap_trajectory_nojump_box(
+    traj: NDArray[np.float32],
+    box_vectors: NDArray[np.float32],
+) -> NDArray[np.float32]:
+    """NPT & triclinic-aware trajectory "nojump" unwrapping using per-frame `[F, 3, 3]` box vectors (Å)."""
+    ...
+
+def image_molecules(
+    coords: NDArray[np.float32],
+    box_vectors: NDArray[np.float32],
+    mol_ranges: Sequence[Tuple[int, int]],
+    anchor_mol: int = 0,
+) -> NDArray[np.float32]:
+    """Triclinic & NPT-aware two-stage molecular imaging: makes each `(start, end)` molecule whole and shifts its COM into the periodic image closest to `anchor_mol`."""
     ...
 
 def calculate_rg(coords: NDArray[np.float32]) -> float:
