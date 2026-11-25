@@ -1,0 +1,131 @@
+{
+  "timestamp_utc": "2026-11-25T13:32:10Z",
+  "strux_rs_version": "0.6.0",
+  "strux_rs_file": "/tmp/claude-0/-home-user/e3a978a0-a44a-57d2-bdb2-116daea35e25/scratchpad/v060/lib/python3.13/site-packages/strux_rs/__init__.py",
+  "git_commit": "c97d0bf-dirty",
+  "hardware": {
+    "hostname": "vm",
+    "os": "Linux 6.18.44-fc-v880 (x86_64)",
+    "python": "3.13.18",
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz"
+  },
+  "benchmarks": [
+    {
+      "benchmark": "unwrap_pbc",
+      "n_atoms": 500,
+      "strux_ms": 0.01118707299997368,
+      "baseline_ms": 1.6192795999984355,
+      "baseline_name": "NumPy_loop_scaled_from_2000",
+      "m_atoms_per_s": 44.69444330980735,
+      "speedup": 144.74560056971518
+    },
+    {
+      "benchmark": "unwrap_pbc",
+      "n_atoms": 2000,
+      "strux_ms": 0.044302715999947395,
+      "baseline_ms": 6.163842000006525,
+      "baseline_name": "NumPy_loop_scaled_from_2000",
+      "m_atoms_per_s": 45.14395911985113,
+      "speedup": 139.130115634758
+    },
+    {
+      "benchmark": "unwrap_pbc",
+      "n_atoms": 10000,
+      "strux_ms": 0.2134472399995957,
+      "baseline_ms": 31.050555000007307,
+      "baseline_name": "NumPy_loop_scaled_from_2000",
+      "m_atoms_per_s": 46.84998503620353,
+      "speedup": 145.47180371161568
+    },
+    {
+      "benchmark": "unwrap_pbc",
+      "n_atoms": 50000,
+      "strux_ms": 1.602754699996467,
+      "baseline_ms": 154.41525000028378,
+      "baseline_name": "NumPy_loop_scaled_from_2000",
+      "m_atoms_per_s": 31.196289737980624,
+      "speedup": 96.34365757943131
+    },
+    {
+      "benchmark": "unwrap_pbc",
+      "n_atoms": 200000,
+      "strux_ms": 6.2855288000037035,
+      "baseline_ms": 596.2116500001002,
+      "baseline_name": "NumPy_loop_scaled_from_2000",
+      "m_atoms_per_s": 31.819120771490567,
+      "speedup": 94.85465248361426
+    },
+    {
+      "benchmark": "unwrap_trajectory_nojump",
+      "n_frames": 100,
+      "n_atoms": 1000,
+      "strux_ms": 0.5369876800000384,
+      "frames_per_s": 186224.0116942587,
+      "gb_per_s": 4.469376280662209
+    },
+    {
+      "benchmark": "unwrap_trajectory_nojump",
+      "n_frames": 500,
+      "n_atoms": 1000,
+      "strux_ms": 3.1285097249991622,
+      "frames_per_s": 159820.50367451995,
+      "gb_per_s": 3.835692088188479
+    },
+    {
+      "benchmark": "unwrap_trajectory_nojump",
+      "n_frames": 2000,
+      "n_atoms": 1000,
+      "strux_ms": 27.222722100003693,
+      "frames_per_s": 73468.03867199337,
+      "gb_per_s": 1.763232928127841
+    },
+    {
+      "benchmark": "unwrap_trajectory_nojump",
+      "n_frames": 5000,
+      "n_atoms": 2000,
+      "strux_ms": 170.01556199998427,
+      "frames_per_s": 29409.072564783586,
+      "gb_per_s": 1.411635483109612
+    },
+    {
+      "benchmark": "trajectory_io",
+      "format": "GRO (GROMACS) read",
+      "n_frames": 200,
+      "n_atoms": 500,
+      "strux_ms": 16.790986099999827,
+      "frames_per_s": 11911.152734502117
+    },
+    {
+      "benchmark": "trajectory_io",
+      "format": "PDB (ASCII) read",
+      "n_frames": 200,
+      "n_atoms": 500,
+      "strux_ms": 20.304546800002754,
+      "frames_per_s": 9850.010540494943
+    },
+    {
+      "benchmark": "trajectory_io",
+      "format": "PDB multi-model write",
+      "n_frames": 200,
+      "n_atoms": 500,
+      "strux_ms": 90.24754939999866,
+      "frames_per_s": 2216.126657506813
+    },
+    {
+      "benchmark": "trajectory_io",
+      "format": "XTC (XDR) read",
+      "n_frames": 200,
+      "n_atoms": 500,
+      "strux_ms": 1.8348397000011119,
+      "frames_per_s": 109001.34763809548
+    },
+    {
+      "benchmark": "trajectory_io",
+      "format": "DCD (CHARMM) read",
+      "n_frames": 200,
+      "n_atoms": 500,
+      "strux_ms": 0.6685105999963525,
+      "frames_per_s": 299172.5187320758
+    }
+  ]
+}
